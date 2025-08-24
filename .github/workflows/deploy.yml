@@ -61,6 +61,7 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend to Cloud Run
     runs-on: ubuntu-latest
+    if: false  # Skip frontend deployment since it's already working
     
     steps:
     - name: Checkout code

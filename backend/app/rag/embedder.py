@@ -22,7 +22,7 @@ try:
     FAISS_AVAILABLE = True
 except ImportError:
     FAISS_AVAILABLE = False
-    logging.warning("FAISS not available, embedding functionality disabled")
+    logging.warning("FAISS not available, embedding functionality disabled - using fallback search")
 
 logger = logging.getLogger(__name__)
 
