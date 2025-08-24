@@ -4,7 +4,7 @@
 export const config = {
   // API Configuration
   apiBase: (__API_BASE__ as string) || '',
-  isProduction: (__IS_PRODUCTION__ as boolean) || false,
+  isProduction: (__IS_PRODUCTION__ as boolean) || true, // Set to true for production deployment
   appVersion: (__APP_VERSION__ as string) || '2.0.0',
   
   // Feature Flags
@@ -56,8 +56,8 @@ export const config = {
 // Helper function to get full API URL
 export function getApiUrl(endpoint: string): string {
   if (config.isProduction) {
-    // In production, use relative URLs (same domain)
-    return endpoint;
+    // In production, use the Cloud Run backend URL
+    return `https://ai-chatbot-backend-irsvqln4dq-uc.a.run.app${endpoint}`;
   } else {
     // In development, use proxy (no base URL needed)
     return endpoint;
