@@ -30,9 +30,18 @@ jobs:
     
     - name: Verify Authentication
       run: |
+        echo "=== Current working directory ==="
+        pwd
+        echo "=== Listing files ==="
+        ls -la
+        echo "=== Google Cloud Auth Status ==="
         gcloud auth list
+        echo "=== Google Cloud Config ==="
         gcloud config list
+        echo "=== Setting Project ==="
         gcloud config set project ${{ env.PROJECT_ID }}
+        echo "=== Verifying Project ==="
+        gcloud config get-value project
     
     - name: Configure Docker for GCR
       run: |
@@ -71,12 +80,21 @@ jobs:
         npm ci
     
     - name: Build frontend
-      working-directory: frontend
       run: |
+        echo "=== Current working directory ==="
         pwd
-        ls -la src/lib/
-        ls -la src/components/ui/
+        echo "=== Root directory contents ==="
+        ls -la
+        echo "=== Frontend directory contents ==="
+        ls -la frontend/
+        echo "=== Frontend src directory contents ==="
+        ls -la frontend/src/
+        echo "=== Frontend src/lib directory contents ==="
+        ls -la frontend/src/lib/
+        echo "=== Installing dependencies ==="
+        cd frontend
         npm ci
+        echo "=== Building frontend ==="
         npm run build
     
     - name: Setup Google Cloud CLI
