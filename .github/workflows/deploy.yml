@@ -97,6 +97,15 @@ jobs:
         service_account_key: ${{ secrets.GCP_SA_KEY }}
         project_id: ${{ secrets.GCP_PROJECT_ID }}
     
+    - name: Verify Frontend Authentication
+      run: |
+        echo "=== Google Cloud Auth Status ==="
+        gcloud auth list
+        echo "=== Google Cloud Config ==="
+        gcloud config list
+        echo "=== Setting Project ==="
+        gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
+    
     - name: Create bucket if not exists
       run: |
         gsutil mb -p ${{ secrets.GCP_PROJECT_ID }} -c STANDARD -l us-central1 gs://ai-chatbot-jb020725-frontend || true
