@@ -83,8 +83,8 @@ class APIClient {
   
   private determineBaseUrl(): string {
     if (config.isProduction) {
-      // Production: use same domain (relative URLs)
-      return '';
+      // Production: use the deployed backend URL
+      return 'https://ai-chatbot-backend-irsvqln4dq-uc.a.run.app';
     } else {
       // Development: use proxy (no base URL needed)
       return '';
