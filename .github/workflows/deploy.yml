@@ -28,10 +28,15 @@ jobs:
         service_account_key: ${{ secrets.GCP_SA_KEY }}
         project_id: ${{ secrets.GCP_PROJECT_ID }}
     
+    - name: Verify Authentication
+      run: |
+        gcloud auth list
+        gcloud config list
+        gcloud config set project ${{ env.PROJECT_ID }}
+    
     - name: Configure Docker for GCR
       run: |
         gcloud auth configure-docker
-        gcloud config set project ${{ env.PROJECT_ID }}
         gcloud auth list
     
     - name: Deploy to Cloud Run
@@ -66,8 +71,11 @@ jobs:
         npm ci
     
     - name: Build frontend
+      working-directory: frontend
       run: |
-        cd frontend
+        pwd
+        ls -la src/lib/
+        ls -la src/components/ui/
         npm ci
         npm run build
     
