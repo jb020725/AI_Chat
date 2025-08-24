@@ -1,6 +1,6 @@
 ﻿name: Auto-Deploy to Google Cloud
 
-# Force new deployment - fixed service account key
+# Force new deployment - fixed Artifact Registry permissions
 on:
   push:
     branches: [ main ]
