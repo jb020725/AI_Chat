@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: us-central1
+  SERVICE_NAME: ai-chatbot-backend
+  BUCKET_NAME: ai-chatbot-jb020725-frontend
+
 jobs:
   deploy-backend:
     name: Deploy Backend to Cloud Run
@@ -13,10 +19,10 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Setup Google Cloud CLI
-      uses: google-github-actions/setup-gcloud@v1
+      uses: google-github-actions/setup-gcloud@v2
       with:
         service_account_key: ${{ secrets.GCP_SA_KEY }}
         project_id: ${{ secrets.GCP_PROJECT_ID }}
@@ -26,10 +32,10 @@ jobs:
     
     - name: Deploy to Cloud Run
       run: |
-        gcloud run deploy ai-chatbot-backend \
+        gcloud run deploy ${{ env.SERVICE_NAME }} \
           --source ./backend \
           --platform managed \
-          --region us-central1 \
+          --region ${{ env.REGION }} \
           --allow-unauthenticated \
           --memory 2Gi \
           --cpu 1 \
@@ -41,12 +47,12 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       
     - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
     
@@ -61,13 +67,17 @@ jobs:
         npm run build
     
     - name: Setup Google Cloud CLI
-      uses: google-github-actions/setup-gcloud@v1
+      uses: google-github-actions/setup-gcloud@v2
       with:
         service_account_key: ${{ secrets.GCP_SA_KEY }}
         project_id: ${{ secrets.GCP_PROJECT_ID }}
     
+    - name: Create bucket if not exists
+      run: |
+        gsutil mb -p ${{ env.PROJECT_ID }} -c STANDARD -l ${{ env.REGION }} gs://${{ env.BUCKET_NAME }} || true
+    
     - name: Deploy to Cloud Storage
       run: |
-        cd frontend
-        gsutil -m rsync -r -d dist/ gs://${{ secrets.GCP_PROJECT_ID }}-frontend/
-        gsutil web set -m index.html gs://${{ secrets.GCP_PROJECT_ID }}-frontend/
+        gsutil -m rsync -r -d frontend/dist/ gs://${{ env.BUCKET_NAME }}/
+        gsutil web set -m index.html -e index.html gs://${{ env.BUCKET_NAME }}/
+        gsutil iam ch allUsers:objectViewer gs://${{ env.BUCKET_NAME }}
