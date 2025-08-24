@@ -6,8 +6,8 @@ COPY dist/ /usr/share/nginx/html/
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Expose port
-EXPOSE 8080
+# Expose port (Cloud Run expects 8000)
+EXPOSE 8000
 
-# Start nginx
+# Start nginx on port 8000
 CMD ["nginx", "-g", "daemon off;"]
