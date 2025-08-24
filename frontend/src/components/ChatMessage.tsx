@@ -1,4 +1,4 @@
-import { cn } from "../lib/utils";
+import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, Shield, Info } from "lucide-react";
