@@ -30,6 +30,11 @@ class Settings:
     TOP_K_RETRIEVAL: int = int(os.getenv("TOP_K_RETRIEVAL", "3"))
     LOW_SCORE_THRESHOLD: float = float(os.getenv("LOW_SCORE_THRESHOLD", "0.22"))
     
+    # GCS (Google Cloud Storage) settings for RAG persistence
+    GCS_ENABLED: bool = os.getenv("GCS_ENABLED", "false").lower() == "true"
+    GCS_BUCKET: str = os.getenv("GCS_BUCKET", "")
+    GCS_INDEX_PREFIX: str = os.getenv("GCS_INDEX_PREFIX", "rag/indices")
+    
     # CORS Settings
     CORS_ORIGINS: list = os.getenv("CORS_ORIGINS", "*").split(",")
     

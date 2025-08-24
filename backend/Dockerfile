@@ -13,12 +13,8 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies with optimizations
+# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir numpy==1.24.3 && \
-    pip install --no-cache-dir faiss-cpu==1.7.4 && \
-    pip install --no-cache-dir torch==2.1.0+cpu --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir sentence-transformers==2.2.2 && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
