@@ -11,6 +11,7 @@ jobs:
   deploy-backend:
     name: Deploy Backend to Cloud Run
     runs-on: ubuntu-latest
+    if: false  # Skip backend deployment since it's already deployed
     
     steps:
     - name: Checkout code
