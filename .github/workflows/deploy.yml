@@ -1,6 +1,6 @@
 ﻿name: Auto-Deploy to Google Cloud
 
-# Force new deployment - updated workflow
+# Force new deployment - fixed authentication order
 on:
   push:
     branches: [ main ]
