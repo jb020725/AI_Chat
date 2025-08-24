@@ -3,14 +3,23 @@
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Install system dependencies for ML packages
+RUN apt-get update && apt-get install -y \
+    curl \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies with optimizations
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir numpy==1.24.3 && \
+    pip install --no-cache-dir faiss-cpu==1.7.4 && \
+    pip install --no-cache-dir torch==2.1.0+cpu --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir sentence-transformers==2.2.2 && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
