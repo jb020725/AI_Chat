@@ -59,7 +59,7 @@ jobs:
           --set-env-vars ENVIRONMENT=production
 
   deploy-frontend:
-    name: Deploy Frontend to Cloud Storage
+    name: Deploy Frontend to Cloud Run
     runs-on: ubuntu-latest
     
     steps:
@@ -94,8 +94,13 @@ jobs:
       with:
         project_id: ${{ secrets.GCP_PROJECT_ID }}
     
-    - name: Deploy to Cloud Storage
+    - name: Deploy to Cloud Run
       run: |
-        gsutil -m rsync -r -d frontend/dist/ gs://ai-chatbot-jb020725-frontend/
-        gsutil web set -m index.html -e index.html gs://ai-chatbot-jb020725-frontend/
-        gsutil acl ch -r -u AllUsers:R gs://ai-chatbot-jb020725-frontend/
+        gcloud run deploy ai-chatbot-frontend \
+          --source ./frontend \
+          --platform managed \
+          --region us-central1 \
+          --allow-unauthenticated \
+          --memory 1Gi \
+          --cpu 1 \
+          --set-env-vars ENVIRONMENT=production
