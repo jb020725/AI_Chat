@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment files (CRITICAL - excludes secrets)
+.env
+test.env
+*.env
+.env.*
+
+# Database files (excludes local dev databases)
+*.db
+*.sqlite
+*.sqlite3
+chatbot.db
+conversations.db
+
+# Logs
+logs/
+*.log
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node modules (frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+dist/
+
+# Temporary files
+*.tmp
+*.temp
+deployment_cleanup.ps1
+prepare_deployment.py
