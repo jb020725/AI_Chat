@@ -4,8 +4,13 @@ Standard architecture with separate loader, embedder, and retriever modules
 """
 
 from .loader import load_documents, load_documents_by_country, get_available_countries
-from .embedder import get_embedder, DocumentEmbedder
+from .embedder import LightweightEmbedder
 from .retriever import retrieve, search_by_country, get_retriever, DocumentRetriever
+
+# Create a get_embedder function that returns the LightweightEmbedder
+def get_embedder():
+    """Get the embedder instance"""
+    return LightweightEmbedder()
 
 __all__ = [
     # Loader functions
@@ -15,7 +20,7 @@ __all__ = [
     
     # Embedder
     'get_embedder',
-    'DocumentEmbedder',
+    'LightweightEmbedder',
     
     # Retriever functions
     'retrieve',
