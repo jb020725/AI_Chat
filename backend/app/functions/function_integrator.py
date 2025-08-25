@@ -93,9 +93,19 @@ class FunctionIntegrator:
                 self.logger.warning(f"New function calling format failed: {e}")
                 # Fallback to basic generation without function calling
                 self.logger.info("Falling back to basic generation without function calling")
-                response = self.llm_model.generate_content(prompt)
-                # Mark that no functions were called
-                response._no_function_calling = True
+                try:
+                    response = self.llm_model.generate_content(prompt)
+                    # Mark that no functions were called
+                    response._no_function_calling = True
+                except Exception as fallback_error:
+                    self.logger.error(f"Fallback generation also failed: {fallback_error}")
+                    # Return a basic response
+                    return {
+                        "llm_response": "I'm having trouble processing your request right now. Please try again in a moment.",
+                        "function_calls": [],
+                        "processing_successful": False,
+                        "error": str(fallback_error)
+                    }
             
             # Debug: Log the raw response structure
             self.logger.info(f"Raw response type: {type(response)}")
@@ -107,7 +117,12 @@ class FunctionIntegrator:
                 self.logger.info("Using fallback response processing (no function calling)")
                 
                 # Try to parse function calls from the text response
-                llm_text = response.text if hasattr(response, 'text') else str(response)
+                try:
+                    llm_text = response.text if hasattr(response, 'text') else str(response)
+                except Exception as text_error:
+                    self.logger.error(f"Failed to get response text: {text_error}")
+                    llm_text = "I'm having trouble processing your request. Please try again."
+                
                 parsed_functions = self._parse_function_calls_from_text(llm_text)
                 
                 if parsed_functions:

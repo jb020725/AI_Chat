@@ -381,7 +381,7 @@ async def healthz():
 async def chat(request: Request, chat_request: ChatRequest):
     """Main chat endpoint"""
     try:
-        # Generate session ID if not provided
+        # Use provided session ID or generate new one
         session_id = chat_request.session_id or f"session_{datetime.now().timestamp()}"
         
         # Extract user information for THIS TURN

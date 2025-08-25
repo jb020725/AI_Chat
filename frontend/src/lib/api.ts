@@ -155,9 +155,24 @@ class APIClient {
   async sendMessage(message: string, sessionId?: string): Promise<ChatResponse> {
     console.log("💬 Sending message:", message.substring(0, 50) + "...");
     
+    // Get existing session ID or generate new one
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      // Check if we have a session ID stored for this conversation
+      currentSessionId = sessionStorage.getItem("current_session_id");
+      if (!currentSessionId) {
+        // Generate new session ID for new conversation
+        currentSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        sessionStorage.setItem("current_session_id", currentSessionId);
+        console.log("🆕 Generated new session ID:", currentSessionId);
+      } else {
+        console.log("🔄 Using existing session ID:", currentSessionId);
+      }
+    }
+    
     const payload = {
       message,
-      session_id: sessionId, // Don't use localStorage - let backend generate new session
+      session_id: currentSessionId,
       user_id: "anonymous"
     };
     
@@ -166,10 +181,10 @@ class APIClient {
       body: JSON.stringify(payload)
     });
     
-    // Don't store session ID - we want fresh sessions each time
-    // if (response.session_id) {
-    //   localStorage.setItem("session_id", response.session_id);
-    // }
+    // Store the session ID for this conversation
+    if (response.session_id) {
+      sessionStorage.setItem("current_session_id", response.session_id);
+    }
     
     // Log safety violations and risk levels for monitoring
     if (response.safety_violation) {
