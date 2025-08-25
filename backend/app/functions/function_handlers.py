@@ -306,8 +306,25 @@ class FunctionHandler:
             # Debug logging
             self.logger.info(f"LEAD SAVE CHECK - Name: {current_name}, Phone: {current_phone}, Email: {current_email}")
             
-            # Save lead if we have name AND (phone OR email)
-            if current_name and (current_phone or current_email):
+            # Check if we should ask for missing contact info FIRST
+            should_ask_for_contact = False
+            missing_contact_type = None
+            
+            # If we have a name but missing both email and phone, ask for contact
+            if current_name and not current_phone and not current_email:
+                should_ask_for_contact = True
+                missing_contact_type = "email_or_phone"
+            # If we have name and email but no phone, ask for phone
+            elif current_name and current_email and not current_phone:
+                should_ask_for_contact = True
+                missing_contact_type = "phone"
+            # If we have name and phone but no email, ask for email
+            elif current_name and current_phone and not current_email:
+                should_ask_for_contact = True
+                missing_contact_type = "email"
+            
+            # Only save as lead if we have complete info AND we're not asking for contact
+            if current_name and current_phone and current_email and not should_ask_for_contact:
                 # Determine contact method for message
                 contact_method = "phone" if extracted_data.get('phone') else "email"
                 contact_value = extracted_data.get('phone') or extracted_data.get('email')
@@ -348,23 +365,6 @@ class FunctionHandler:
                     }
                 else:
                     self.logger.error(f"Failed to save lead automatically: {lead_result.get('error')}")
-            
-            # Check if we should ask for missing contact info
-            should_ask_for_contact = False
-            missing_contact_type = None
-            
-            # If we have a name but missing both email and phone, ask for contact
-            if current_name and not current_phone and not current_email:
-                should_ask_for_contact = True
-                missing_contact_type = "email_or_phone"
-            # If we have name and email but no phone, ask for phone
-            elif current_name and current_email and not current_phone:
-                should_ask_for_contact = True
-                missing_contact_type = "phone"
-            # If we have name and phone but no email, ask for email
-            elif current_name and current_phone and not current_email:
-                should_ask_for_contact = True
-                missing_contact_type = "email"
             
             # If we don't have complete lead info, update session and potentially ask for contact
             response_data = {

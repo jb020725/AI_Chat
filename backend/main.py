@@ -536,86 +536,9 @@ async def get_status():
         "uptime": 0  # You can add actual uptime calculation if needed
     }
 
-@app.get("/api/debug/session/{session_id}")
-async def debug_session(session_id: str):
-    """Debug endpoint to see session memory state"""
-    if not MEMORY_AVAILABLE:
-        return {"error": "Memory system not available"}
-    
-    try:
-        memory = get_session_memory()
-        session_metadata = memory.get_session_metadata(session_id)
-        return session_metadata
-    except Exception as e:
-        return {"error": f"Failed to get session metadata: {str(e)}"}
 
-@app.get("/api/debug/sessions")
-async def debug_all_sessions():
-    """Debug endpoint to see all active sessions"""
-    if not MEMORY_AVAILABLE:
-        return {"error": "Memory system not available"}
-    
-    try:
-        memory = get_session_memory()
-        # This would need to be implemented in SessionMemory class
-        return {"message": "Debug endpoint added - implement get_all_sessions() in SessionMemory"}
-    except Exception as e:
-        return {"error": f"Failed to get sessions: {str(e)}"}
 
-@app.get("/api/debug/conversation/{session_id}")
-async def debug_conversation(session_id: str):
-    """Debug endpoint to see conversation history being passed to LLM"""
-    if not MEMORY_AVAILABLE:
-        return {"error": "Memory system not available"}
-    
-    try:
-        memory = get_session_memory()
-        conversation_context = memory.get_conversation_context(session_id)
-        conversation_history = conversation_context.get("conversation_history", [])
-        
-        return {
-            "session_id": session_id,
-            "conversation_history": conversation_history,
-            "history_count": len(conversation_history),
-            "conversation_summary": conversation_context.get("conversation_summary"),
-            "session_info": conversation_context.get("session_info")
-        }
-    except Exception as e:
-        return {"error": f"Failed to get conversation debug info: {str(e)}"}
 
-@app.get("/api/debug/email-test")
-async def test_email():
-    """Test email functionality"""
-    if not LEAD_CAPTURE_AVAILABLE or not lead_capture_tool:
-        return {"error": "Lead capture system not available"}
-    
-    try:
-        # Test email tool
-        email_tool = lead_capture_tool.email_tool
-        
-        # Test with sample lead data
-        test_lead = {
-            "email": "test@example.com",
-            "name": "Test User",
-            "phone": "1234567890",
-            "target_country": "USA"
-        }
-        
-        # Try to send test email
-        result = email_tool.send_lead_notification(test_lead, "Test conversation context")
-        
-        return {
-            "email_configured": email_tool.email_configured,
-            "smtp_server": email_tool.smtp_server,
-            "smtp_port": email_tool.smtp_port,
-            "username": email_tool.username,
-            "from_email": email_tool.from_email,
-            "lead_notification_email": settings.LEAD_NOTIFICATION_EMAIL,
-            "test_result": result
-        }
-        
-    except Exception as e:
-        return {"error": f"Email test failed: {str(e)}"}
 
 # Initialize Memory System with LLM model
 if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
