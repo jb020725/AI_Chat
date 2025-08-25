@@ -70,17 +70,15 @@ class RAGLLMIntegrator:
                     function_result = self.function_integrator.process_with_functions(
                         user_message=user_message,
                         session_id=session_id,
-                        rag_context=rag_results,
                         conversation_history=conversation_history,
                         session_info=session_info
                     )
                     
                     if function_result.get("processing_successful"):
-                        # Add RAG context and metadata to function result
-                        function_result["rag_context"] = rag_results
+                        # Add metadata to function result (RAG-free)
                         function_result["prompt_used"] = "Function calling prompt"
                         function_result["metadata"] = {
-                            "rag_results_count": len(rag_results) if rag_results else 0,
+                            "rag_results_count": 0,  # RAG disabled
                             "has_country_info": bool(session_info.get('country') if session_info else False),
                             "has_conversation_history": bool(conversation_history),
                             "function_calls_made": len(function_result.get("function_calls", [])),

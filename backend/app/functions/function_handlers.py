@@ -10,7 +10,7 @@ Handles the execution of functions called by the LLM:
 import logging
 from typing import Dict, Any, Optional
 from app.memory.session_memory import get_session_memory
-from app.rag.retriever import retrieve
+# RAG disabled - using LLM knowledge only
 from app.tools.lead_capture_tool import LeadCaptureTool
 import time
 
@@ -403,7 +403,7 @@ class FunctionHandler:
     
     def handle_define_response_strategy(self, session_id: str, **kwargs) -> Dict[str, Any]:
         """
-        Define response strategy when RAG has no results
+        Define response strategy for off-topic questions
         """
         try:
             user_query = kwargs.get('user_query', '').lower()
@@ -437,15 +437,10 @@ class FunctionHandler:
             is_on_topic = any(keyword in user_query for keyword in student_visa_keywords)
             
             # Determine strategy
-            if rag_results_count > 0:
-                strategy = "answer_with_rag"
-                reason = "RAG has relevant results - use them"
-                instruction = "Use the RAG results to answer this question"
-                
-            elif is_on_topic and rag_results_count == 0:
-                strategy = "answer_with_memory"
-                reason = "Student visa question but no RAG results - use session memory"
-                instruction = "Use session memory and your knowledge to answer this student visa question"
+            if is_on_topic:
+                strategy = "answer_with_knowledge"
+                reason = "Student visa question - use your knowledge and session memory"
+                instruction = "Use your knowledge and session memory to answer this student visa question"
                 
             else:
                 strategy = "redirect_to_topic"

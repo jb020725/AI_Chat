@@ -45,16 +45,14 @@ class FunctionIntegrator:
     def process_with_functions(self, 
                              user_message: str,
                              session_id: str,
-                             rag_context: List[Dict[str, Any]] = None,
                              conversation_history: List[Dict[str, str]] = None,
                              session_info: Dict[str, Any] = None) -> Dict[str, Any]:
         """
-        Process user message with function calling enabled
+        Process user message with function calling enabled (RAG-free)
         
         Args:
             user_message: User's input message
             session_id: Current session ID
-            rag_context: RAG search results
             conversation_history: Previous conversation
             session_info: Current session information (country, email, etc.)
             
@@ -229,13 +227,13 @@ Please provide a natural, helpful response to the user based on the function res
             prompt_parts.append("FUNCTION CALLING RULES:")
     
             prompt_parts.append("- If user shows serious intent (wants to apply, needs guidance) OR shows time-sensitive needs (immediate help), call handle_contact_request")
-            prompt_parts.append("- If RAG has no results, call define_response_strategy to determine how to respond")
+            prompt_parts.append("- If user asks about topics outside student visa scope, call define_response_strategy to redirect")
     
             prompt_parts.append("")
             
             prompt_parts.append("1. handle_contact_request(user_query, conversation_context, detected_interests?) - Smart contact handler for both lead opportunities (serious intent) and time-sensitive contact needs (immediate help). Routes appropriately based on urgency level.")
             prompt_parts.append("2. detect_and_save_contact_info(user_query, conversation_context, extraction_mode?) - Automatically detect, extract, and save contact information from user messages. Use when user provides any contact details.")
-            prompt_parts.append("3. define_response_strategy(user_query, rag_results_count, session_memory?) - Define response strategy when RAG has no results. Use when RAG returns 0 results.")
+            prompt_parts.append("3. define_response_strategy(user_query, session_memory?) - Define response strategy for off-topic questions. Use when user asks about non-student visa topics.")
             prompt_parts.append("")
             
 
@@ -248,7 +246,7 @@ Please provide a natural, helpful response to the user based on the function res
     
             prompt_parts.append("- WHEN TO CALL: When user shows serious intent (wants to apply, needs guidance) OR shows time-sensitive needs (immediate help), call handle_contact_request")
             prompt_parts.append("- WHEN TO CALL: When user provides ANY contact information (name, email, phone, country, intake), call detect_and_save_contact_info to automatically extract and save it")
-            prompt_parts.append("- WHEN TO CALL: If RAG has no results, call define_response_strategy to determine how to respond")
+            prompt_parts.append("- WHEN TO CALL: If user asks about topics outside student visa scope, call define_response_strategy to redirect")
     
             prompt_parts.append("- RESPONSE STRATEGIES: Follow the strategy defined by define_response_strategy function exactly")
             prompt_parts.append("- CONTACT COLLECTION: Always detect opportunities to collect contact information when users show serious intent")

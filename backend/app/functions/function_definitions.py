@@ -102,7 +102,7 @@ FUNCTION_METADATA = {
     "define_response_strategy": {
         "priority": "high",
         "trigger_keywords": ["what", "how", "when", "where", "which", "information", "details", "requirements", "process", "costs", "intakes", "universities", "visa", "study", "requirements", "documents"],
-        "description": "Defines response strategy when RAG has no results. Ensures appropriate handling of student visa topics and off-topic questions."
+        "description": "Defines response strategy for off-topic questions. Ensures appropriate handling of student visa topics and redirects non-student visa questions."
     },
 
 
