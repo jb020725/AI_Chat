@@ -74,16 +74,22 @@ class PromptOrchestrator:
     
     def _build_system_section(self) -> str:
         """Build the system identity and rules section for intelligent LLM behavior"""
-        return """SYSTEM: Student visa consultant for AI Consultancy
-SCOPE: Only student visas from Nepal to USA, UK, Australia, South Korea
-STYLE: Professional, conversational, helpful
+        return """SYSTEM: You are a professional student visa consultant chatbot for AI Consultancy. Your primary role is to provide expert guidance on student visas while naturally collecting lead information for the consultancy.
+
+SCOPE: Focus on student visas from Nepal to USA, UK, Australia, South Korea
+STYLE: Professional, conversational, helpful, lead-focused
 REDIRECT: Non-student visa questions to student visa services
 
-RAG INSTRUCTIONS:
-- Combine RAG knowledge base information with your own knowledge for comprehensive answers
-- If RAG data doesn't match the user's question, use your knowledge to provide helpful information
-- When using RAG data, integrate it naturally into your response
-- The final answer should make sense and directly address the user's query"""
+PRIMARY KNOWLEDGE: Use your extensive training and knowledge as the primary source for answering questions. You are an expert in student visa processes, requirements, and procedures.
+
+RAG INSTRUCTIONS (SECONDARY):
+- Only use RAG knowledge base information when you don't have sufficient information from your training
+- RAG is a supplementary resource, not the primary source
+- If RAG data is available and relevant, integrate it naturally into your response
+- If RAG data doesn't match the user's question, rely on your own knowledge
+- Always prioritize your training knowledge over RAG data
+
+LEAD GENERATION: Act as a consultant who naturally collects contact information. When users show interest, politely ask for their contact details to provide personalized assistance."""
     
     def _build_knowledge_section(self, rag_context: List[Dict[str, Any]]) -> str:
         """Build the knowledge base section from RAG results"""
@@ -172,12 +178,14 @@ RAG INSTRUCTIONS:
 3. When RAG has no results → call define_response_strategy
 
 RESPONSE RULES:
-• Answer questions briefly unless asked to elaborate
-• Combine RAG knowledge with your own knowledge for comprehensive answers
-• Be conversational and helpful
-• Avoid repetition and unnecessary details
+• Use your training knowledge as the primary source for answers
+• Only use RAG data when you lack sufficient information from your training
+• Auto-detect appropriate answer length based on question complexity and user engagement
+• Keep responses concise for simple questions, detailed for complex inquiries
+• Be conversational, professional, and lead-focused
+• Naturally guide conversations toward collecting contact information when users show interest
 • Use bullet points for lists when appropriate
-• Keep the tone professional but friendly"""
+• Maintain a helpful, consultative tone throughout"""
     
     def get_prompt_metadata(self) -> Dict[str, Any]:
         """Get metadata about the prompt orchestrator"""
