@@ -8,7 +8,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.rag.retriever import retrieve
-from app.functions.function_handlers import FunctionHandlers
+from app.functions.function_handlers import FunctionHandler
 import logging
 
 # Set up logging
@@ -46,7 +46,7 @@ def test_lead_creation():
     """Test lead creation logic"""
     print("\n🧪 Testing Lead Creation Logic...")
     
-    handlers = FunctionHandlers()
+    handlers = FunctionHandler()
     
     # Test case 1: Name + Email (should create lead)
     test_data_1 = {
@@ -57,7 +57,7 @@ def test_lead_creation():
     
     print(f"\n📝 Test 1: Name + Email")
     try:
-        result = handlers.detect_and_save_contact_info(**test_data_1)
+        result = handlers.handle_detect_and_save_contact_info('test_session_1', **test_data_1)
         print(f"   Success: {result.get('success')}")
         print(f"   Saved as lead: {result.get('data', {}).get('saved_as_lead')}")
         print(f"   Message: {result.get('data', {}).get('message', 'No message')}")
@@ -73,7 +73,7 @@ def test_lead_creation():
     
     print(f"\n📝 Test 2: Name + Phone")
     try:
-        result = handlers.detect_and_save_contact_info(**test_data_2)
+        result = handlers.handle_detect_and_save_contact_info('test_session_2', **test_data_2)
         print(f"   Success: {result.get('success')}")
         print(f"   Saved as lead: {result.get('data', {}).get('saved_as_lead')}")
         print(f"   Message: {result.get('data', {}).get('message', 'No message')}")

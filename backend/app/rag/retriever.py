@@ -57,17 +57,21 @@ class DocumentRetriever:
         
         # Comprehensive country detection keywords
         country_keywords = {
-            'usa': ['usa', 'united states', 'america', 'us', 'u.s.', 'u.s.a', 'f-1', 'f1', 'student visa usa', 'american'],
-            'uk': ['uk', 'united kingdom', 'britain', 'england', 'tier 4', 'tier4', 'student visa uk', 'british'],
-            'australia': ['australia', 'aussie', 'subclass 500', 'student visa australia', 'australian'],
-            'south korea': ['south korea', 'korea', 'korean', 'd-2', 'd-4', 'd2', 'd4', 'student visa korea', 'korean student']
+            'usa': ['usa', 'united states', 'america', 'us', 'u.s.', 'u.s.a', 'f-1', 'f1', 'american'],
+            'uk': ['uk', 'united kingdom', 'britain', 'england', 'tier 4', 'tier4', 'british'],
+            'australia': ['australia', 'aussie', 'subclass 500', 'australian'],
+            'south korea': ['south korea', 'korea', 'korean', 'd-2', 'd-4', 'd2', 'd4', 'korean student']
         }
         
-        # Check for exact country matches first
+        # Check for exact country matches first (using word boundaries)
+        import re
         for country, keywords in country_keywords.items():
-            if any(keyword in query_lower for keyword in keywords):
-                logger.info(f"🔍 Detected country '{country}' from query: '{query}'")
-                return country
+            for keyword in keywords:
+                # Use word boundaries to avoid partial matches
+                pattern = r'\b' + re.escape(keyword) + r'\b'
+                if re.search(pattern, query_lower):
+                    logger.info(f"🔍 Detected country '{country}' from query: '{query}'")
+                    return country
         
         # If no direct match, check for visa type patterns
         visa_patterns = {
@@ -78,9 +82,12 @@ class DocumentRetriever:
         }
         
         for country, patterns in visa_patterns.items():
-            if any(pattern in query_lower for pattern in patterns):
-                logger.info(f"🔍 Detected country '{country}' from visa pattern: '{query}'")
-                return country
+            for pattern in patterns:
+                # Use word boundaries for visa patterns too
+                pattern_re = r'\b' + re.escape(pattern) + r'\b'
+                if re.search(pattern_re, query_lower):
+                    logger.info(f"🔍 Detected country '{country}' from visa pattern: '{query}'")
+                    return country
         
         logger.info(f"❓ No country detected from query: '{query}'")
         return None
