@@ -102,12 +102,10 @@ class APIClient {
   protected async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = this.baseUrl + endpoint;
     
-    // Inject persistent session header if available
-    const sessionId = typeof window !== 'undefined' ? localStorage.getItem("session_id") : undefined;
+    // Remove session ID persistence - let backend generate new session each time
     const headers: HeadersInit = {
       "Content-Type": "application/json",
       ...(options.headers || {}),
-      ...(sessionId ? { "X-Session-ID": sessionId } : {}),
     };
     
     const requestOptions: RequestInit = {
@@ -159,7 +157,7 @@ class APIClient {
     
     const payload = {
       message,
-      session_id: sessionId || localStorage.getItem("session_id"),
+      session_id: sessionId, // Don't use localStorage - let backend generate new session
       user_id: "anonymous"
     };
     
@@ -168,10 +166,10 @@ class APIClient {
       body: JSON.stringify(payload)
     });
     
-    // Store session ID for future requests
-    if (response.session_id) {
-      localStorage.setItem("session_id", response.session_id);
-    }
+    // Don't store session ID - we want fresh sessions each time
+    // if (response.session_id) {
+    //   localStorage.setItem("session_id", response.session_id);
+    // }
     
     // Log safety violations and risk levels for monitoring
     if (response.safety_violation) {
@@ -195,7 +193,7 @@ class APIClient {
       phone: payload.phone,
       target_country: payload.target_country,
       intake: payload.preferred_intake,
-      session_id: payload.session_id || localStorage.getItem("session_id")
+      session_id: payload.session_id // Don't use localStorage - use provided session ID
     };
     
     return this.makeRequest<LeadResponse>(config.endpoints.leads, {

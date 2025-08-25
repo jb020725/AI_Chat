@@ -185,103 +185,22 @@ class SessionMemory:
             self.supabase = None
     
     def _save_session_to_supabase(self, session_id: str, session_data: UserInfo) -> bool:
-        """Save session data to Supabase"""
-        if not self.supabase:
-            return False
-            
-        try:
-            # Prepare data for Supabase
-            supabase_data = {
-                "session_id": session_id,
-                "email": session_data.email,
-                "phone": session_data.phone,
-                "name": session_data.name,
-                "country": session_data.country,
-                "intake": session_data.intake,
-                "program_level": session_data.program_level,
-                "field_of_study": session_data.field_of_study,
-                "conversation_history": json.dumps(session_data.conversation_history),
-                "conversation_summary": session_data.conversation_summary,
-                "exchange_count": session_data.exchange_count,
-                "created_at": session_data.created_at.isoformat() if session_data.created_at else None,
-                "last_updated": session_data.last_updated.isoformat() if session_data.last_updated else None
-            }
-            
-            # Upsert to sessions table
-            result = self.supabase.table("sessions").upsert(supabase_data).execute()
-            logger.info(f"Session {session_id} saved to Supabase")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to save session {session_id} to Supabase: {e}")
-            return False
+        """Save session data to Supabase - DISABLED for now"""
+        # DISABLED: Don't save to Supabase - keep sessions in-memory only
+        logger.info(f"Session {session_id} NOT saved to Supabase (persistence disabled)")
+        return True
     
     def _load_session_from_supabase(self, session_id: str) -> Optional[UserInfo]:
-        """Load session data from Supabase"""
-        if not self.supabase:
-            return None
-            
-        try:
-            # Query sessions table
-            result = self.supabase.table("sessions").select("*").eq("session_id", session_id).execute()
-            
-            if result.data:
-                session_data = result.data[0]
-                
-                # Reconstruct UserInfo object
-                user_info = UserInfo(
-                    email=session_data.get("email"),
-                    phone=session_data.get("phone"),
-                    name=session_data.get("name"),
-                    country=session_data.get("country"),
-                    intake=session_data.get("intake"),
-                    program_level=session_data.get("program_level"),
-                    field_of_study=session_data.get("field_of_study"),
-                    conversation_summary=session_data.get("conversation_summary", ""),
-                    exchange_count=session_data.get("exchange_count", 0)
-                )
-                
-                # Load conversation history
-                if session_data.get("conversation_history"):
-                    try:
-                        user_info.conversation_history = json.loads(session_data["conversation_history"])
-                    except:
-                        user_info.conversation_history = []
-                
-                # Set timestamps
-                if session_data.get("created_at"):
-                    try:
-                        user_info.created_at = datetime.fromisoformat(session_data["created_at"])
-                    except:
-                        user_info.created_at = datetime.now()
-                        
-                if session_data.get("last_updated"):
-                    try:
-                        user_info.last_updated = datetime.fromisoformat(session_data["last_updated"])
-                    except:
-                        user_info.last_updated = datetime.now()
-                
-                logger.info(f"Session {session_id} loaded from Supabase")
-                return user_info
-                
-        except Exception as e:
-            logger.error(f"Failed to load session {session_id} from Supabase: {e}")
-            
+        """Load session data from Supabase - DISABLED for now"""
+        # DISABLED: Don't load from Supabase - always create new sessions
+        logger.info(f"Session {session_id} NOT loaded from Supabase (persistence disabled)")
         return None
     
     def _delete_session_from_supabase(self, session_id: str) -> bool:
-        """Delete session data from Supabase"""
-        if not self.supabase:
-            return False
-            
-        try:
-            result = self.supabase.table("sessions").delete().eq("session_id", session_id).execute()
-            logger.info(f"Session {session_id} deleted from Supabase")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to delete session {session_id} from Supabase: {e}")
-            return False
+        """Delete session data from Supabase - DISABLED for now"""
+        # DISABLED: Don't delete from Supabase - sessions are in-memory only
+        logger.info(f"Session {session_id} NOT deleted from Supabase (persistence disabled)")
+        return True
     
     def get_session(self, session_id: str) -> UserInfo:
         """Get or create session for user"""
@@ -301,10 +220,10 @@ class SessionMemory:
         session = self.get_session(session_id)
         session.update_info(new_info)
         
-        # Save to Supabase
-        self._save_session_to_supabase(session_id, session)
+        # Don't save to Supabase - keep in memory only
+        # self._save_session_to_supabase(session_id, session)
         
-        logger.info(f"Updated session {session_id} with new info")
+        logger.info(f"Updated session {session_id} with new info (in-memory only)")
     
     def get_user_info(self, session_id: str) -> UserInfo:
         """Get current user information for session"""
@@ -364,10 +283,10 @@ class SessionMemory:
         session = self.get_session(session_id)
         session.add_conversation_exchange(user_input, bot_response)
         
-        # Save to Supabase after each exchange
-        self._save_session_to_supabase(session_id, session)
+        # Don't save to Supabase - keep in memory only
+        # self._save_session_to_supabase(session_id, session)
         
-        logger.info(f"Added conversation exchange to session {session_id}")
+        logger.info(f"Added conversation exchange to session {session_id} (in-memory only)")
     
     def get_conversation_context(self, session_id: str) -> Dict[str, Any]:
         """Get comprehensive conversation context for LLM"""
