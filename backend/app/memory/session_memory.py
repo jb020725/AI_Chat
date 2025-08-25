@@ -169,8 +169,9 @@ class SessionMemory:
             
         try:
             # Get Supabase credentials from environment
-            url = os.getenv('SUPABASE_URL')
-            key = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
+            from app.config import settings
+            url = settings.SUPABASE_URL
+            key = settings.SUPABASE_SERVICE_ROLE_KEY
             
             if not url or not key:
                 logger.warning("Supabase credentials not found - sessions will only be stored in memory")

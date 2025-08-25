@@ -36,6 +36,7 @@ sys.path.append('.')
 # Import centralized utilities
 from app.utils.paths import CFG
 from app.utils.logging_config import setup_clean_logging
+from app.config import settings
 
 # Import RAG components
 try:
@@ -84,13 +85,11 @@ logger = logging.getLogger(__name__)
 limiter = Limiter(key_func=get_remote_address)
 logger.info("Rate limiting initialized")
 
-# Load environment variables from centralized path
-from dotenv import load_dotenv
-load_dotenv(CFG.ENV_FILE)
+# Environment variables are loaded from Cloud Run via app.config.settings
 
 # Initialize Gemini
 if GEMINI_AVAILABLE:
-    genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
+    genai.configure(api_key=settings.GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-2.5-flash')
     
     # Initialize RAG-LLM integration with the model
@@ -337,10 +336,21 @@ async def api_info():
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
+    # Check RAG system health
+    rag_status = "Not Available"
+    if RAG_AVAILABLE:
+        try:
+            from app.rag.embedder import get_embedder
+            embedder = get_embedder()
+            rag_status = embedder.get_index_info()
+        except Exception as e:
+            rag_status = f"Error: {str(e)}"
+    
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "rag_available": RAG_AVAILABLE,
+        "rag_status": rag_status,
         "gemini_available": GEMINI_AVAILABLE,
         "memory_available": MEMORY_AVAILABLE,
         "lead_capture_available": LEAD_CAPTURE_AVAILABLE,
@@ -353,6 +363,17 @@ async def health_check():
             "index_dir": str(CFG.INDEX_DIR)
         }
     }
+
+@app.get("/healthz")
+async def healthz():
+    """Lightweight health check for Cloud Run"""
+    try:
+        from app.rag.embedder import get_embedder
+        embedder = get_embedder()
+        ready = embedder.is_available()
+        return {"ready": ready}, 200 if ready else 503
+    except Exception as e:
+        return {"ready": False, "error": str(e)}, 503
 
 @app.post("/api/chat", response_model=ChatResponse)
 @limiter.limit("60/minute")  # 60 requests per minute per IP
@@ -589,7 +610,7 @@ async def test_email():
             "smtp_port": email_tool.smtp_port,
             "username": email_tool.username,
             "from_email": email_tool.from_email,
-            "lead_notification_email": "janakbhat34@gmail.com",  # From test.env
+            "lead_notification_email": settings.LEAD_NOTIFICATION_EMAIL,
             "test_result": result
         }
         

@@ -8,6 +8,7 @@ venv/
 pip-log.txt
 .env
 test.env
+production.env
 *.log
 logs/
 *.db

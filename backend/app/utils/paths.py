@@ -62,7 +62,8 @@ def _build() -> PathConfig:
     memory_dir = app_dir / "memory"
     
     # Important files
-    env_file = backend_root / "test.env"
+        # Environment variables are loaded from Cloud Run, not from local files
+    env_file = None
     requirements_file = backend_root / "requirements.txt"
     database_file = backend_root / "chatbot.db"
     
