@@ -51,22 +51,20 @@ class SmartResponseGenerator:
             # Get current session info
             session_info = self.memory.get_user_info(session_id)
             
-            # If no RAG context provided, try to get it from RAG system
-            if not rag_context or rag_context.strip() == "":
-                try:
-                    from app.rag.retriever import retrieve
-                    # Get relevant RAG context for the user message
-                    rag_results = retrieve(user_message, top_k=3)
-                    if rag_results:
-                        rag_context = "\n\n".join([
-                            f"Source: {r.get('title', 'Unknown')}\n{r.get('content', '')[:300]}..."
-                            for r in rag_results[:3]
-                        ])
-                    else:
-                        rag_context = "No specific information found in knowledge base."
-                except Exception as e:
-                    logger.warning(f"Failed to get RAG context: {e}")
-                    rag_context = "No specific information found in knowledge base."
+            # Always get RAG context from RAG system (ignore the passed parameter)
+            try:
+                from app.rag.retriever import retrieve
+                # Get relevant RAG context for the user message
+                rag_results = retrieve(user_message, top_k=3)
+                if rag_results:
+                    rag_context = rag_results  # Keep as list of dicts for proper processing
+                    logger.info(f"✅ RAG found {len(rag_results)} results")
+                else:
+                    rag_context = []
+                    logger.info("❌ No RAG results found")
+            except Exception as e:
+                logger.warning(f"Failed to get RAG context: {e}")
+                rag_context = []
             
             # Build the response
             response_parts = []
@@ -81,7 +79,7 @@ class SmartResponseGenerator:
             logger.info(f"Session info: {session_info.__dict__ if hasattr(session_info, '__dict__') else session_info}")
             
             # Clean Loop Implementation
-            rag_results_count = len(rag_context) if rag_context else 0
+            rag_results_count = len(rag_context) if isinstance(rag_context, list) else 0
             logger.info(f"RAG results count: {rag_results_count}")
             
             # Option 1: RAG has results - use them
@@ -133,7 +131,7 @@ class SmartResponseGenerator:
         """Generate simple response when RAG has results but LLM integration fails"""
         try:
             # Use the first RAG result to generate a simple response
-            if rag_context and len(rag_context) > 0:
+            if isinstance(rag_context, list) and len(rag_context) > 0:
                 first_result = rag_context[0]
                 content = first_result.get('content', '')
                 title = first_result.get('title', '')

@@ -138,15 +138,48 @@ class FunctionIntegrator:
                     self.logger.info(f"Found {len(parsed_functions)} function calls in text response")
                     # Execute the parsed functions
                     executed_functions = []
+                    final_response = llm_text
+                    
                     for func_call in parsed_functions:
                         try:
                             result = self._execute_parsed_function(func_call, session_id)
                             executed_functions.append(result)
+                            
+                            # If function executed successfully, generate a natural response
+                            if result.get('success') and result.get('result', {}).get('success'):
+                                function_result = result.get('result', {})
+                                function_data = function_result.get('data', {})
+                                
+                                # Check if we need to ask for contact info
+                                ask_for_contact = function_data.get('ask_for_contact', False)
+                                contact_message = function_data.get('contact_message', '')
+                                
+                                if ask_for_contact and contact_message:
+                                    final_response = contact_message
+                                else:
+                                    # Generate natural response for successful function
+                                    natural_prompt = f"""You are a helpful visa consultant for AI Consultancy.
+
+A function was just executed successfully: {func_call.get('function_name')}
+
+User's original question: {user_message}
+
+Function result: {function_result.get('message', 'Success')}
+
+Please provide a natural, helpful response to the user based on the function result. Be conversational and informative."""
+                                    
+                                    try:
+                                        natural_response = self.llm_model.generate_content(natural_prompt)
+                                        if natural_response and natural_response.text:
+                                            final_response = natural_response.text
+                                    except Exception as resp_error:
+                                        self.logger.error(f"Error generating natural response: {resp_error}")
+                                        
                         except Exception as e:
                             self.logger.error(f"Failed to execute parsed function {func_call}: {e}")
                     
                     return {
-                        "llm_response": llm_text,
+                        "llm_response": final_response,
                         "function_calls": executed_functions,
                         "processing_successful": True,
                         "fallback_mode": True,
