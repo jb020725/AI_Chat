@@ -99,13 +99,13 @@ class FunctionIntegrator:
                     response._no_function_calling = True
                 except Exception as fallback_error:
                     self.logger.error(f"Fallback generation also failed: {fallback_error}")
-                    # Return a basic response
-                    return {
-                        "llm_response": "I'm having trouble processing your request right now. Please try again in a moment.",
-                        "function_calls": [],
-                        "processing_successful": False,
-                        "error": str(fallback_error)
-                    }
+                                                              # Return a basic response
+                     return {
+                         "llm_response": "I am unable to process request for this question, please move on if you have any other questions.",
+                         "function_calls": [],
+                         "processing_successful": False,
+                         "error": str(fallback_error)
+                     }
             
             # Debug: Log the raw response structure
             self.logger.info(f"Raw response type: {type(response)}")
@@ -118,10 +118,19 @@ class FunctionIntegrator:
                 
                 # Try to parse function calls from the text response
                 try:
-                    llm_text = response.text if hasattr(response, 'text') else str(response)
+                    # Check if response was filtered/blocked
+                    if hasattr(response, 'candidates') and response.candidates:
+                        candidate = response.candidates[0]
+                        if hasattr(candidate, 'finish_reason') and candidate.finish_reason == 12:
+                            self.logger.warning("Response was filtered by Gemini API (finish_reason=12)")
+                            llm_text = "I am unable to process request for this question, please move on if you have any other questions."
+                        else:
+                            llm_text = response.text if hasattr(response, 'text') else str(response)
+                    else:
+                        llm_text = response.text if hasattr(response, 'text') else str(response)
                 except Exception as text_error:
                     self.logger.error(f"Failed to get response text: {text_error}")
-                    llm_text = "I'm having trouble processing your request. Please try again."
+                    llm_text = "I am unable to process request for this question, please move on if you have any other questions."
                 
                 parsed_functions = self._parse_function_calls_from_text(llm_text)
                 
@@ -164,12 +173,12 @@ class FunctionIntegrator:
             self.logger.error(f"Error in function calling: {e}")
             import traceback
             self.logger.error(f"Full traceback: {traceback.format_exc()}")
-            return {
-                "llm_response": f"I encountered an error processing your request. Please try again.",
-                "function_calls": [],
-                "processing_successful": False,
-                "error": str(e)
-            }
+                         return {
+                 "llm_response": "I am unable to process request for this question, please move on if you have any other questions.",
+                 "function_calls": [],
+                 "processing_successful": False,
+                 "error": str(e)
+             }
     
     def _build_function_prompt(self, user_message: str, conversation_history: List[Dict], user_info: Dict = None) -> str:
         """Build the function calling prompt for Gemini"""
@@ -186,7 +195,7 @@ class FunctionIntegrator:
             prompt_parts.append("")
             prompt_parts.append("[ALERT] FUNCTION CALLING RULES:")
     
-            prompt_parts.append("- If user shows serious intent (wants to apply, needs guidance) OR shows urgency (emergency, immediate help), call handle_contact_request")
+            prompt_parts.append("- If user shows serious intent (wants to apply, needs guidance) OR shows urgency (critical, immediate help), call handle_contact_request")
             prompt_parts.append("- If RAG has no results, call define_response_strategy to determine how to respond")
     
             prompt_parts.append("")
@@ -204,7 +213,7 @@ class FunctionIntegrator:
             
             prompt_parts.append("CRITICAL RULES:")
     
-            prompt_parts.append("- MANDATORY: When user shows serious intent (wants to apply, needs guidance) OR shows urgency (emergency, immediate help), call handle_contact_request")
+            prompt_parts.append("- MANDATORY: When user shows serious intent (wants to apply, needs guidance) OR shows urgency (critical, immediate help), call handle_contact_request")
             prompt_parts.append("- MANDATORY: When user provides ANY contact information (name, email, phone, country, intake), call detect_and_save_contact_info to automatically extract and save it")
             prompt_parts.append("- MANDATORY: If RAG has no results, call define_response_strategy to determine how to respond")
     

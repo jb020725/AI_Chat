@@ -10,7 +10,7 @@ Defines the schema for functions that the LLM can call to:
 FUNCTIONS = [
     {
         "name": "handle_contact_request",
-        "description": "Smart contact request handler that detects both lead opportunities and urgent contact needs. Use when user shows serious intent (wants to apply, needs guidance) OR shows extreme urgency (needs immediate call, emergency situation).",
+        "description": "Smart contact request handler that detects both lead opportunities and urgent contact needs. Use when user shows serious intent (wants to apply, needs guidance) OR shows high urgency (needs immediate assistance, urgent situation).",
         "parameters": {
             "type": "object",
             "properties": {
@@ -29,8 +29,8 @@ FUNCTIONS = [
                 },
                 "urgency_level": {
                     "type": "string",
-                    "description": "Detected urgency level (normal, urgent, extreme, emergency)",
-                    "enum": ["normal", "urgent", "extreme", "emergency"]
+                    "description": "Detected urgency level (normal, urgent, high, critical)",
+                    "enum": ["normal", "urgent", "high", "critical"]
                 }
             },
             "required": ["user_query", "conversation_context"]
@@ -91,8 +91,8 @@ FUNCTION_METADATA = {
 
     "handle_contact_request": {
         "priority": "high",
-        "trigger_keywords": ["i want to apply", "i am applying", "ready to apply", "looking for guidance", "need guidance", "ai consultancy", "your company", "call me", "contact me", "representative", "advisor", "office visit", "process my visa", "handle my application", "march intake", "fall intake", "spring intake", "deadline", "timeline", "urgent", "emergency", "extreme", "immediate", "talk to someone", "need help now", "call me now"],
-        "description": "Smart contact handler that detects both lead opportunities (serious intent) and urgent contact needs (emergency, immediate help). Routes appropriately based on urgency level."
+        "trigger_keywords": ["i want to apply", "i am applying", "ready to apply", "looking for guidance", "need guidance", "ai consultancy", "your company", "call me", "contact me", "representative", "advisor", "office visit", "process my visa", "handle my application", "march intake", "fall intake", "spring intake", "deadline", "timeline", "urgent", "critical", "high", "immediate", "talk to someone", "need help now", "call me now"],
+        "description": "Smart contact handler that detects both lead opportunities (serious intent) and urgent contact needs (critical, immediate help). Routes appropriately based on urgency level."
     },
     "detect_and_save_contact_info": {
         "priority": "high",

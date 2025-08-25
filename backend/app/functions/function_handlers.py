@@ -73,7 +73,7 @@ class FunctionHandler:
             
             # URGENCY detection keywords (immediate human contact needed)
             urgency_keywords = [
-                "urgent", "emergency", "extreme", "immediate", "now",
+                "urgent", "critical", "extreme", "immediate", "now",
                 "talk to someone", "need help now", "call me now", "immediately",
                 "asap", "right now", "this instant", "critical", "desperate"
             ]
@@ -88,7 +88,7 @@ class FunctionHandler:
             
             if shows_urgency:
                 # URGENT CONTACT NEEDED - Give AI Consultancy number immediately
-                urgency_level = "extreme" if any(word in user_query for word in ["emergency", "extreme", "critical"]) else "urgent"
+                urgency_level = "extreme" if any(word in user_query for word in ["critical", "extreme", "desperate"]) else "urgent"
                 contact_preference = "call" if "call" in user_query else "any"
                 
                 message = f"🚨 I understand this is {urgency_level}! Here's our direct contact:\n\n📞 **AI Consultancy**: {AI_CONSULTANCY_NUMBERS['urgent']}\n📱 **WhatsApp**: {AI_CONSULTANCY_NUMBERS['whatsapp']}\n🏢 **Office**: {AI_CONSULTANCY_NUMBERS['office']}\n\n**Someone from our team will call you immediately!** Please share your phone number so we can reach you right away."

@@ -295,7 +295,7 @@ class SmartResponseGenerator:
     def _generate_helpful_response(self, user_message: str, session_info) -> str:
         """DEPRECATED: This method is no longer used - LLM handles everything"""
         # This method is deprecated - LLM now handles all responses
-        return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@ai consultancyeducation.com | Phone: +1-234-567-8900"
+        return "I'm here to help you with student visa information. How can I assist you today?"
     
     def _get_question_intro(self, session_info) -> str:
         """DEPRECATED: This method is no longer used - LLM handles everything"""
