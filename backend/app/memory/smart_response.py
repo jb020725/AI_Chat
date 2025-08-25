@@ -71,143 +71,138 @@ class SmartResponseGenerator:
             # Build the response
             response_parts = []
             
+            # Import domain checker
+            from app.utils.domain_checker import is_in_domain
+            
             # Debug: Check if RAG-LLM integrator is available
             logger.info(f"RAG-LLM integrator available: {self.rag_llm_integrator is not None}")
             logger.info(f"User message: {user_message}")
             logger.info(f"RAG context: {rag_context[:100]}...")
             logger.info(f"Session info: {session_info.__dict__ if hasattr(session_info, '__dict__') else session_info}")
             
-            # Use RAG-LLM integration if available
+            # Clean Loop Implementation
+            rag_results_count = len(rag_context) if rag_context else 0
+            logger.info(f"RAG results count: {rag_results_count}")
+            
+            # Option 1: RAG has results - use them
+            if rag_results_count > 0:
+                logger.info("✅ RAG has results - using RAG + LLM")
+                if self.rag_llm_integrator:
+                    try:
+                        result = self.rag_llm_integrator.process_query(
+                            user_message=user_message,
+                            session_info=session_info.__dict__ if hasattr(session_info, '__dict__') else session_info,
+                            conversation_history=conversation_history,
+                            top_k=3,
+                            session_id=session_id
+                        )
+                        
+                        if result.get('processing_successful') and result.get('llm_response'):
+                            return result.get('llm_response')
+                        else:
+                            # Fallback to simple RAG response
+                            return self._generate_simple_rag_response(user_message, rag_context)
+                    except Exception as e:
+                        logger.error(f"RAG-LLM processing failed: {e}")
+                        return self._generate_simple_rag_response(user_message, rag_context)
+                else:
+                    return self._generate_simple_rag_response(user_message, rag_context)
+            
+            # Option 2: No RAG - check if in domain
+            else:
+                logger.info("❌ No RAG results - checking domain")
+                domain_check = is_in_domain(user_message)
+                logger.info(f"Domain check result: {domain_check}")
+                
+                if domain_check.get('in_domain', False):
+                    logger.info("✅ In domain - using functions")
+                    # Use functions to handle domain questions
+                    return self._handle_domain_query_with_functions(
+                        user_message, session_id, conversation_history, session_info
+                    )
+                else:
+                    logger.info("❌ Out of domain - redirecting")
+                    # Outside domain - redirect to better LLM
+                    return self._generate_out_of_domain_response(domain_check)
+            
+        except Exception as e:
+            logger.error(f"Error in smart response generation: {e}")
+            return "I'm having technical difficulties. Please try again."
+
+    def _generate_simple_rag_response(self, user_message: str, rag_context: List[Dict]) -> str:
+        """Generate simple response when RAG has results but LLM integration fails"""
+        try:
+            # Use the first RAG result to generate a simple response
+            if rag_context and len(rag_context) > 0:
+                first_result = rag_context[0]
+                content = first_result.get('content', '')
+                title = first_result.get('title', '')
+                
+                return f"Based on the information I have: {content[:200]}... For more detailed guidance, please contact our team."
+            else:
+                return "I have some information about that. Please contact our team for detailed guidance."
+        except Exception as e:
+            logger.error(f"Error generating simple RAG response: {e}")
+            return "I have information about that topic. Please contact our team for assistance."
+
+    def _handle_domain_query_with_functions(self, user_message: str, session_id: str, 
+                                          conversation_history: List[Dict], session_info: Any) -> str:
+        """Handle domain queries using functions when RAG has no results"""
+        try:
+            logger.info("Handling domain query with functions")
+            
+            # Try to use function integrator if available
             if self.rag_llm_integrator:
-                logger.info("Using RAG-LLM integration for response generation")
-                print("🔍 [DEBUG] RAG-LLM integrator is available - proceeding with LLM generation")
                 try:
-                    # Process query through RAG-LLM pipeline with smart functions
                     result = self.rag_llm_integrator.process_query(
                         user_message=user_message,
                         session_info=session_info.__dict__ if hasattr(session_info, '__dict__') else session_info,
                         conversation_history=conversation_history,
-                        top_k=3,
+                        top_k=0,  # No RAG results
                         session_id=session_id
                     )
                     
-                    print("🔍 [DEBUG] === RAG-LLM RESULT DEBUG ===")
-                    print(f"🔍 [DEBUG] Full result: {result}")
-                    print(f"🔍 [DEBUG] Result keys: {list(result.keys()) if result else 'None'}")
-                    print(f"🔍 [DEBUG] Processing successful: {result.get('processing_successful')}")
-                    print(f"🔍 [DEBUG] LLM response key exists: {'llm_response' in result}")
-                    print(f"🔍 [DEBUG] LLM response value: {result.get('llm_response')}")
-                    print(f"🔍 [DEBUG] Metadata: {result.get('metadata', {})}")
+                    if result.get('processing_successful') and result.get('llm_response'):
+                        return result.get('llm_response')
                     
-                    logger.info(f"=== RAG-LLM RESULT DEBUG ===")
-                    logger.info(f"Full result: {result}")
-                    logger.info(f"Result keys: {list(result.keys()) if result else 'None'}")
-                    logger.info(f"Processing successful: {result.get('processing_successful')}")
-                    logger.info(f"LLM response key exists: {'llm_response' in result}")
-                    logger.info(f"LLM response value: {result.get('llm_response')}")
-                    logger.info(f"Metadata: {result.get('metadata', {})}")
-                    
-                    if result.get('processing_successful'):
-                        print("✅ [DEBUG] RAG-LLM processing was successful - now validating LLM response")
-                        # Add LLM-generated response (which now includes intelligent follow-ups)
-                        llm_response = result.get('llm_response', '')
-                        print(f"🔍 [DEBUG] === LLM RESPONSE VALIDATION DEBUG ===")
-                        print(f"🔍 [DEBUG] Raw LLM response: '{llm_response}'")
-                        print(f"🔍 [DEBUG] LLM response type: {type(llm_response)}")
-                        print(f"🔍 [DEBUG] LLM response length: {len(llm_response) if llm_response else 0}")
-                        print(f"🔍 [DEBUG] LLM response is None: {llm_response is None}")
-                        print(f"🔍 [DEBUG] LLM response is empty string: {llm_response == ''}")
-                        
-                        logger.info(f"=== LLM RESPONSE VALIDATION DEBUG ===")
-                        logger.info(f"Raw LLM response: '{llm_response}'")
-                        logger.info(f"LLM response type: {type(llm_response)}")
-                        logger.info(f"LLM response length: {len(llm_response) if llm_response else 0}")
-                        logger.info(f"LLM response is None: {llm_response is None}")
-                        logger.info(f"LLM response is empty string: {llm_response == ''}")
-                        
-                        if llm_response:
-                            stripped_response = llm_response.strip()
-                            logger.info(f"Stripped response: '{stripped_response}'")
-                            logger.info(f"Stripped length: {len(stripped_response)}")
-                        else:
-                            stripped_response = ""
-                            logger.info(f"Stripped response: '{stripped_response}'")
-                            logger.info(f"Stripped length: {len(stripped_response)}")
-                        
-                        # Much more lenient validation - accept any reasonable LLM response
-                        print(f"🔍 [DEBUG] Final validation check:")
-                        print(f"🔍 [DEBUG] - llm_response exists: {bool(llm_response)}")
-                        print(f"🔍 [DEBUG] - stripped length: {len(stripped_response)}")
-                        print(f"🔍 [DEBUG] - validation condition: {llm_response and len(stripped_response) > 0}")
-                        
-                        # Check if we have a valid LLM response OR successful function calls
-                        has_valid_response = llm_response and len(stripped_response) > 0
-                        has_function_calls = result.get('function_calls') and len(result['function_calls']) > 0
-                        
-                        if has_valid_response:
-                            print("✅ [DEBUG] SUCCESS: LLM response validation passed - using LLM response")
-                            response_parts.append(llm_response)
-                            logger.info("✅ SUCCESS: Added LLM-generated response to response parts")
-                            logger.info(f"   - Response length: {len(stripped_response)} characters")
-                            
-                            # CRITICAL: If LLM response is successful, return ONLY that response
-                            # Do NOT fall back to templates or add anything else
-                            final_response = llm_response
-                            logger.info(f"Returning ONLY LLM response: {len(final_response)} characters")
-                            return final_response
-                        elif has_function_calls:
-                            print("✅ [DEBUG] SUCCESS: Function calls executed successfully")
-                            logger.info("✅ SUCCESS: Function calls executed successfully")
-                            
-                            # Check if we have a valid LLM response from tool response generation
-                            if llm_response and len(llm_response.strip()) > 0:
-                                print("✅ [DEBUG] SUCCESS: Tool response generated - using LLM response")
-                                logger.info("✅ SUCCESS: Tool response generated - using LLM response")
-                                logger.info(f"   - Tool response length: {len(llm_response)} characters")
-                                
-                                # Return the tool response generated by Gemini
-                                final_response = llm_response
-                                logger.info(f"Returning tool response: {len(final_response)} characters")
-                                return final_response
-                            else:
-                                # No tool response generated - let the system handle it naturally
-                                logger.info("Function calls executed but no tool response generated - allowing natural flow")
-                                return ""
-                        else:
-                            print("❌ [DEBUG] FAILED: No valid LLM response or function calls found")
-                            print(f"❌ [DEBUG] - llm_response exists: {bool(llm_response)}")
-                            print(f"❌ [DEBUG] - stripped length: {len(stripped_response)}")
-                            print(f"❌ [DEBUG] - function_calls count: {len(result.get('function_calls', []))}")
-                            print(f"❌ [DEBUG] - Final decision: SIMPLE FALLBACK")
-                            logger.warning(f"❌ FAILED: No valid LLM response or function calls found")
-                            logger.warning(f"   - llm_response exists: {bool(llm_response)}")
-                            logger.warning(f"   - stripped length: {len(stripped_response)}")
-                            logger.warning(f"   - function_calls count: {len(result.get('function_calls', []))}")
-                            logger.warning(f"   - Final decision: SIMPLE FALLBACK")
-                            # Simple fallback - only when LLM fails
-                            return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@aiconsultancy.com | Phone: +1-234-567-8900"
-                    else:
-                        # LLM processing failed - simple fallback
-                        print("❌ [DEBUG] RAG-LLM processing failed (processing_successful=False) - using simple fallback")
-                        logger.warning("RAG-LLM processing failed, using simple fallback")
-                        return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@aiconsultancy.com | Phone: +1-234-567-8900"
-                        
                 except Exception as e:
-                    print(f"💥 [DEBUG] RAG-LLM integration EXCEPTION: {e}")
-                    print(f"💥 [DEBUG] Using simple fallback")
-                    logger.error(f"RAG-LLM integration failed: {e}, using simple fallback")
-                    import traceback
-                    logger.error(f"Traceback: {traceback.format_exc()}")
-                    return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@aiconsultancy.com | Phone: +1-234-567-8900"
-            else:
-                print("⚠️ [DEBUG] No RAG-LLM integrator available - using simple fallback")
-                logger.warning("No RAG-LLM integrator available, using simple fallback")
-                return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@aiconsultancy.com | Phone: +1-234-567-8900"
+                    logger.error(f"Function processing failed: {e}")
+            
+            # Fallback to basic domain response
+            return self._generate_basic_domain_response(user_message)
             
         except Exception as e:
-            logger.error(f"Error generating smart response: {e}")
-            # Simple fallback - no templates
-            return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@aiconsultancy.com | Phone: +1-234-567-8900"
+            logger.error(f"Error handling domain query with functions: {e}")
+            return self._generate_basic_domain_response(user_message)
+
+    def _generate_basic_domain_response(self, user_message: str) -> str:
+        """Generate basic response for domain queries"""
+        message_lower = user_message.lower()
+        
+        # Check for specific patterns and provide appropriate responses
+        if any(word in message_lower for word in ['contact', 'phone', 'number', 'call', 'reach']):
+            return "I'd be happy to connect you with our team! Please provide your contact information (name, email, and phone number) so we can reach out to you with personalized guidance."
+        
+        elif any(word in message_lower for word in ['apply', 'application', 'process']):
+            return "I can help you with the application process! To provide you with the most accurate guidance, could you share your contact details and let me know which country you're interested in studying in?"
+        
+        elif any(word in message_lower for word in ['requirements', 'documents', 'needed']):
+            return "I can help you understand the requirements! To give you specific guidance, please share your contact information and tell me which country you're planning to study in."
+        
+        else:
+            return "I can help you with student visa information! To provide personalized guidance, please share your contact details and let me know which country you're interested in."
+
+    def _generate_out_of_domain_response(self, domain_check: Dict) -> str:
+        """Generate response for out-of-domain queries"""
+        confidence = domain_check.get('confidence', 0.0)
+        reason = domain_check.get('reason', '')
+        
+        if confidence > 0.8:
+            # High confidence out-of-domain
+            return "I specialize in student visas for USA, UK, Australia, and South Korea. Your question appears to be outside my area of expertise. For general questions, I recommend using a general AI assistant like ChatGPT or Google's Gemini."
+        else:
+            # Lower confidence - try to redirect to student visa topics
+            return "I specialize in student visa guidance for USA, UK, Australia, and South Korea. If you have questions about studying abroad, I'd be happy to help! Otherwise, for general questions, I recommend using a general AI assistant."
 
     def _create_tool_response_prompt(self, user_message: str, function_name: str, 
                                     function_result: Dict, conversation_history: List[Dict]) -> str:

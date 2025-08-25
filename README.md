@@ -1,5 +1,35 @@
 # AI Chatbot - Production Ready 
 
+## 🚀 **LIVE DEPLOYMENT URLs**
+
+### **Frontend (Chatbot Interface):**
+```
+https://visa-chatbot-frontend-971031410928.us-central1.run.app
+```
+
+### **Backend (API Service):**
+```
+https://visa-chatbot-backend-971031410928.us-central1.run.app
+```
+
+### **Quick Access Commands:**
+```bash
+# Get current URLs (run from project root)
+gcloud run services list --platform managed --region us-central1 --filter="metadata.name~visa-chatbot"
+
+# Check deployment status
+gcloud run services describe visa-chatbot-frontend --region us-central1
+gcloud run services describe visa-chatbot-backend --region us-central1
+```
+
+### **Deployment Status:**
+- ✅ **Frontend:** Live and connected to backend
+- ✅ **Backend:** Live with RAG, Gemini API, and all functions
+- ✅ **Auto-deployment:** Configured via GitHub Actions
+- ✅ **Stable URLs:** Won't change on redeployment
+
+---
+
 A production-ready AI chatbot with lead capture, built with FastAPI + React + Google Gemini AI.
 
 ## Features 
