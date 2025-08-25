@@ -51,20 +51,9 @@ class SmartResponseGenerator:
             # Get current session info
             session_info = self.memory.get_user_info(session_id)
             
-            # Always get RAG context from RAG system (ignore the passed parameter)
-            try:
-                from app.rag.retriever import retrieve
-                # Get relevant RAG context for the user message
-                rag_results = retrieve(user_message, top_k=3)
-                if rag_results:
-                    rag_context = rag_results  # Keep as list of dicts for proper processing
-                    logger.info(f"✅ RAG found {len(rag_results)} results")
-                else:
-                    rag_context = []
-                    logger.info("❌ No RAG results found")
-            except Exception as e:
-                logger.warning(f"Failed to get RAG context: {e}")
-                rag_context = []
+            # NEW APPROACH: LLM Primary, RAG Secondary - Only get RAG when LLM needs support
+            rag_context = []  # Start with no RAG context
+            logger.info("🔄 LLM-first approach: Starting with no RAG context")
             
             # Build the response
             response_parts = []
@@ -78,50 +67,55 @@ class SmartResponseGenerator:
             logger.info(f"RAG context: {rag_context[:100]}...")
             logger.info(f"Session info: {session_info.__dict__ if hasattr(session_info, '__dict__') else session_info}")
             
-            # Clean Loop Implementation
+            # NEW LOGIC: LLM Primary, RAG Secondary
             rag_results_count = len(rag_context) if isinstance(rag_context, list) else 0
             logger.info(f"RAG results count: {rag_results_count}")
             
-            # Option 1: RAG has results - use them
-            if rag_results_count > 0:
-                logger.info("✅ RAG has results - using RAG + LLM")
+            # Import domain checker
+            from app.utils.domain_checker import is_in_domain
+            domain_check = is_in_domain(user_message)
+            logger.info(f"Domain check result: {domain_check}")
+            
+            # Option 1: In domain - use LLM with optional RAG support
+            if domain_check.get('in_domain', False):
+                logger.info("✅ In domain - using LLM primary with optional RAG support")
+                
+                # Use LLM with RAG as supplementary (only if LLM needs support)
                 if self.rag_llm_integrator:
                     try:
+                        # RAG TURNED OFF: Use LLM knowledge only
                         result = self.rag_llm_integrator.process_query(
                             user_message=user_message,
                             session_info=session_info.__dict__ if hasattr(session_info, '__dict__') else session_info,
                             conversation_history=conversation_history,
-                            top_k=3,
-                            session_id=session_id
+                            top_k=0,  # No RAG retrieval
+                            session_id=session_id,
+                            rag_context=[]  # Empty RAG context - LLM only
                         )
                         
                         if result.get('processing_successful') and result.get('llm_response'):
                             return result.get('llm_response')
                         else:
-                            # Fallback to simple RAG response
-                            return self._generate_simple_rag_response(user_message, rag_context)
+                            # Fallback to pure LLM response
+                            return self._handle_domain_query_with_functions(
+                                user_message, session_id, conversation_history, session_info
+                            )
                     except Exception as e:
-                        logger.error(f"RAG-LLM processing failed: {e}")
-                        return self._generate_simple_rag_response(user_message, rag_context)
+                        logger.error(f"LLM processing failed: {e}")
+                        # Fallback to pure LLM response
+                        return self._handle_domain_query_with_functions(
+                            user_message, session_id, conversation_history, session_info
+                        )
                 else:
-                    return self._generate_simple_rag_response(user_message, rag_context)
-            
-            # Option 2: No RAG - check if in domain
-            else:
-                logger.info("❌ No RAG results - checking domain")
-                domain_check = is_in_domain(user_message)
-                logger.info(f"Domain check result: {domain_check}")
-                
-                if domain_check.get('in_domain', False):
-                    logger.info("✅ In domain - using functions")
-                    # Use functions to handle domain questions
+                    # No integrator - use pure LLM
                     return self._handle_domain_query_with_functions(
                         user_message, session_id, conversation_history, session_info
                     )
-                else:
-                    logger.info("❌ Out of domain - redirecting")
-                    # Outside domain - redirect to better LLM
-                    return self._generate_out_of_domain_response(domain_check)
+            
+            # Option 2: Out of domain - redirect
+            else:
+                logger.info("❌ Out of domain - redirecting")
+                return self._generate_out_of_domain_response(domain_check)
             
         except Exception as e:
             logger.error(f"Error in smart response generation: {e}")

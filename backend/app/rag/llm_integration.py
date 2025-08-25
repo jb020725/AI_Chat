@@ -32,28 +32,36 @@ class RAGLLMIntegrator:
                      session_info: Dict[str, Any] = None,
                      conversation_history: List[Dict[str, str]] = None,
                      top_k: int = 3,
-                     session_id: str = None) -> Dict[str, Any]:
+                     session_id: str = None,
+                     rag_context: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Complete RAG + LLM processing pipeline with function calling
+        Complete LLM-first processing pipeline with optional RAG support
         
         Args:
             user_message: User's query
             session_info: Current session information (country, email, etc.)
             conversation_history: Previous conversation messages
-            top_k: Number of RAG results to retrieve
+            top_k: Number of RAG results to retrieve (if needed)
             session_id: Session ID for function calling
+            rag_context: Optional pre-retrieved RAG context (supplementary)
             
         Returns:
             Dict containing:
                 - llm_response: Generated LLM response
-                - rag_context: Retrieved RAG chunks
+                - rag_context: Retrieved RAG chunks (if any)
                 - prompt_used: The prompt sent to LLM
                 - function_calls: Function calls made by LLM
                 - metadata: Additional processing info
         """
         try:
-            # Step 1: Retrieve relevant information from RAG
-            rag_results = self._retrieve_rag_context(user_message, top_k, session_info)
+            # Step 1: Use provided RAG context or retrieve only if LLM needs support
+            if rag_context is not None:
+                rag_results = rag_context
+                logger.info(f"Using provided RAG context: {len(rag_results)} results")
+            else:
+                # Only retrieve RAG if explicitly needed (LLM-first approach)
+                rag_results = []
+                logger.info("LLM-first approach: No RAG context provided, using LLM knowledge only")
             
             # Step 2: Try function calling first, fallback to regular LLM
             if self.function_integrator and session_id:
