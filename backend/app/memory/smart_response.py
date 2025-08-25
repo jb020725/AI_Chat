@@ -185,12 +185,12 @@ class SmartResponseGenerator:
                             logger.warning(f"   - function_calls count: {len(result.get('function_calls', []))}")
                             logger.warning(f"   - Final decision: SIMPLE FALLBACK")
                             # Simple fallback - only when LLM fails
-                            return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@lakeheadeducation.com | Phone: +1-234-567-8900"
+                            return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@aiconsultancy.com | Phone: +1-234-567-8900"
                     else:
                         # LLM processing failed - simple fallback
                         print("❌ [DEBUG] RAG-LLM processing failed (processing_successful=False) - using simple fallback")
                         logger.warning("RAG-LLM processing failed, using simple fallback")
-                        return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@lakeheadeducation.com | Phone: +1-234-567-8900"
+                        return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@aiconsultancy.com | Phone: +1-234-567-8900"
                         
                 except Exception as e:
                     print(f"💥 [DEBUG] RAG-LLM integration EXCEPTION: {e}")
@@ -198,16 +198,16 @@ class SmartResponseGenerator:
                     logger.error(f"RAG-LLM integration failed: {e}, using simple fallback")
                     import traceback
                     logger.error(f"Traceback: {traceback.format_exc()}")
-                    return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@lakeheadeducation.com | Phone: +1-234-567-8900"
+                    return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@aiconsultancy.com | Phone: +1-234-567-8900"
             else:
                 print("⚠️ [DEBUG] No RAG-LLM integrator available - using simple fallback")
                 logger.warning("No RAG-LLM integrator available, using simple fallback")
-                return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@lakeheadeducation.com | Phone: +1-234-567-8900"
+                return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@aiconsultancy.com | Phone: +1-234-567-8900"
             
         except Exception as e:
             logger.error(f"Error generating smart response: {e}")
             # Simple fallback - no templates
-            return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@lakeheadeducation.com | Phone: +1-234-567-8900"
+            return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@aiconsultancy.com | Phone: +1-234-567-8900"
 
     def _create_tool_response_prompt(self, user_message: str, function_name: str, 
                                     function_result: Dict, conversation_history: List[Dict]) -> str:
@@ -216,7 +216,7 @@ class SmartResponseGenerator:
             prompt_parts = []
             
             # System context with policy rules
-            prompt_parts.append("You are an AI assistant for Lakehead Education, specializing in student visas.")
+            prompt_parts.append("You are an AI assistant for AI Consultancy, specializing in student visas.")
             prompt_parts.append("A function has been executed successfully. Generate a natural, helpful response.")
             prompt_parts.append("")
             prompt_parts.append("SYSTEM POLICY RULES:")
@@ -286,7 +286,7 @@ class SmartResponseGenerator:
     def _generate_helpful_response(self, user_message: str, session_info) -> str:
         """DEPRECATED: This method is no longer used - LLM handles everything"""
         # This method is deprecated - LLM now handles all responses
-        return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@lakeheadeducation.com | Phone: +1-234-567-8900"
+        return "I understand you're interested in UK student visa for bachelor's degree. Let me help you with that information. Email: info@ai consultancyeducation.com | Phone: +1-234-567-8900"
     
     def _get_question_intro(self, session_info) -> str:
         """DEPRECATED: This method is no longer used - LLM handles everything"""

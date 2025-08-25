@@ -116,7 +116,7 @@ class FunctionIntegrator:
             prompt_parts = []
             
             # System context
-            prompt_parts.append("You are an AI assistant for Lakehead Education, specializing in student visas.")
+            prompt_parts.append("You are an AI assistant for AI Consultancy, specializing in student visas.")
             prompt_parts.append("You have access to several functions to help users effectively.")
             prompt_parts.append("")
             
@@ -380,7 +380,7 @@ class FunctionIntegrator:
                                     self.logger.info(f"Function {function_name} succeeded - generating natural response")
                                     
                                     # Create a simple, natural prompt for the LLM to respond
-                                    natural_prompt = f"""You are a helpful visa consultant for Lakehead Education.
+                                    natural_prompt = f"""You are a helpful visa consultant for AI Consultancy.
 
 A function was just executed successfully: {function_name}
 
@@ -404,7 +404,7 @@ Please provide a natural, helpful response to the user based on the function res
                                     self.logger.warning(f"Function {function_name} failed: {function_result.get('message', 'Unknown error')}")
                                     
                                     # Generate graceful response for failed functions
-                                    failure_prompt = f"""You are a helpful visa consultant for Lakehead Education.
+                                    failure_prompt = f"""You are a helpful visa consultant for AI Consultancy.
 
 A function failed to execute: {function_name}
 
@@ -463,7 +463,7 @@ For example, if someone asks about an unsupported country, say: "I'm sorry, but 
             prompt_parts = []
             
             # System context
-            prompt_parts.append("You are an AI assistant for Lakehead Education, specializing in student visas.")
+            prompt_parts.append("You are an AI assistant for AI Consultancy, specializing in student visas.")
             prompt_parts.append("A function has been executed successfully. Generate a natural, helpful response.")
             
             # User's original question

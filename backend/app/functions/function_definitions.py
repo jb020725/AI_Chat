@@ -2,9 +2,9 @@
 Function Definitions for Gemini Native Function Calling
 
 Defines the schema for functions that the LLM can call to:
-1. Collect contact information for Lakehead Education follow-up
+1. Collect contact information for AI Consultancy follow-up
 2. Search country-specific visa information for Nepali students
-3. Qualify leads based on conversation for Lakehead Education services
+3. Qualify leads based on conversation for AI Consultancy services
 """
 
 FUNCTIONS = [
@@ -97,7 +97,7 @@ FUNCTION_METADATA = {
 
     "handle_contact_request": {
         "priority": "high",
-        "trigger_keywords": ["i want to apply", "i am applying", "ready to apply", "looking for guidance", "need guidance", "lakehead", "your company", "call me", "contact me", "representative", "advisor", "office visit", "process my visa", "handle my application", "march intake", "fall intake", "spring intake", "deadline", "timeline", "urgent", "emergency", "extreme", "immediate", "talk to someone", "need help now", "call me now"],
+        "trigger_keywords": ["i want to apply", "i am applying", "ready to apply", "looking for guidance", "need guidance", "ai consultancy", "your company", "call me", "contact me", "representative", "advisor", "office visit", "process my visa", "handle my application", "march intake", "fall intake", "spring intake", "deadline", "timeline", "urgent", "emergency", "extreme", "immediate", "talk to someone", "need help now", "call me now"],
         "description": "Smart contact handler that detects both lead opportunities (serious intent) and urgent contact needs (emergency, immediate help). Routes appropriately based on urgency level."
     },
     "detect_and_save_contact_info": {

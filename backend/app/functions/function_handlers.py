@@ -38,8 +38,8 @@ class FunctionHandler:
             conversation_context = kwargs.get('conversation_context', {})
             detected_interests = kwargs.get('detected_interests', [])
             
-            # Lakehead contact numbers dictionary
-            LAKEHEAD_NUMBERS = {
+            # AI Consultancy contact numbers dictionary
+            AI_CONSULTANCY_NUMBERS = {
                 "primary": "+977-1-4444444",
                 "urgent": "+977-1-5555555", 
                 "whatsapp": "+977-9800000000",
@@ -54,7 +54,7 @@ class FunctionHandler:
                 "help me apply", "assist me", "support me", "guide me through",
                 
                 # Company/service mentions (normal lead opportunity)
-                "lakehead", "lakehead education", "your company", "your service",
+                "ai consultancy", "ai consultancy education", "your company", "your service",
                 "you will help", "you can help", "you will process",
                 
                 # Contact expectations (normal lead opportunity)
@@ -87,11 +87,11 @@ class FunctionHandler:
             has_contact = session_info and (session_info.email or session_info.phone)
             
             if shows_urgency:
-                # URGENT CONTACT NEEDED - Give Lakehead number immediately
+                # URGENT CONTACT NEEDED - Give AI Consultancy number immediately
                 urgency_level = "extreme" if any(word in user_query for word in ["emergency", "extreme", "critical"]) else "urgent"
                 contact_preference = "call" if "call" in user_query else "any"
                 
-                message = f"🚨 I understand this is {urgency_level}! Here's our direct contact:\n\n📞 **Lakehead Education**: {LAKEHEAD_NUMBERS['urgent']}\n📱 **WhatsApp**: {LAKEHEAD_NUMBERS['whatsapp']}\n🏢 **Office**: {LAKEHEAD_NUMBERS['office']}\n\n**Someone from our team will call you immediately!** Please share your phone number so we can reach you right away."
+                message = f"🚨 I understand this is {urgency_level}! Here's our direct contact:\n\n📞 **AI Consultancy**: {AI_CONSULTANCY_NUMBERS['urgent']}\n📱 **WhatsApp**: {AI_CONSULTANCY_NUMBERS['whatsapp']}\n🏢 **Office**: {AI_CONSULTANCY_NUMBERS['office']}\n\n**Someone from our team will call you immediately!** Please share your phone number so we can reach you right away."
                 ask_for_contact = True
                 request_type = "urgent_contact"
                 
@@ -118,7 +118,7 @@ class FunctionHandler:
                     "ask_for_contact": ask_for_contact,
                     "detected_interests": detected_interests,
                     "conversation_context": conversation_context,
-                    "lakehead_numbers": LAKEHEAD_NUMBERS if shows_urgency else None
+                    "ai_consultancy_numbers": AI_CONSULTANCY_NUMBERS if shows_urgency else None
                 }
             }
             

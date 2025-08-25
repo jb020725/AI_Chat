@@ -74,7 +74,7 @@ class PromptOrchestrator:
     
     def _build_system_section(self) -> str:
         """Build the system identity and rules section for intelligent LLM behavior"""
-        return """SYSTEM: Student visa consultant for Lakehead Education
+        return """SYSTEM: Student visa consultant for AI Consultancy
 SCOPE: Only student visas from Nepal to USA, UK, Australia, South Korea
 STYLE: Professional, conversational, helpful
 REDIRECT: Non-student visa questions to student visa services"""

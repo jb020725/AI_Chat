@@ -259,7 +259,7 @@ async def lifespan(app: FastAPI):
     logger.info("AI Chatbot shutting down...")
 
 # FastAPI app
-app = FastAPI(title="Lakehead Education AI Assistant - Production Ready with Rate Limiting", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="AI Consultancy AI Assistant - Production Ready with Rate Limiting", version="2.0.0", lifespan=lifespan)
 
 # Add rate limiting to app state
 app.state.limiter = limiter
@@ -298,7 +298,7 @@ class ChatResponse(BaseModel):
 async def root():
     """Root endpoint with API information"""
     return {
-        "message": "Lakehead Education AI Assistant API - Production Ready with Rate Limiting",
+        "message": "AI Consultancy AI Assistant API - Production Ready with Rate Limiting",
         "version": "2.0.0",
         "status": "running",
         "features": {

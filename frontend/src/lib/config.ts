@@ -53,27 +53,14 @@ export const config = {
   },
 };
 
-// Helper function to automatically detect backend URL
+// Helper function to get stable backend URL
 export function getBackendUrl(): string {
   if (config.isProduction) {
-    // In production, try to auto-detect backend URL
-    const currentHost = window.location.hostname;
-    
-    // If we're on Cloud Run, construct backend URL from current domain
-    if (currentHost.includes('run.app')) {
-      // Extract project and region from current frontend URL
-      const match = currentHost.match(/([^-]+)-([^-]+)-([^-]+)-([^-]+)-([^-]+)\.a\.run\.app/);
-      if (match) {
-        const [, service, project, region, hash, zone] = match;
-        // Construct backend URL using same project/region
-        return `https://ai-chatbot-backend-${project}-${region}.a.run.app`;
-      }
-    }
-    
-    // Fallback to hardcoded URL if auto-detection fails
-    return 'https://ai-chatbot-backend-irsvqln4dq-uc.a.run.app';
+    // Production: use stable custom service names
+    // These URLs will never change unless you manually change the service names
+    return 'https://visa-chatbot-backend-irsvqln4dq-uc.a.run.app';
   } else {
-    // In development, use local backend
+    // Development: use local backend
     return 'http://127.0.0.1:8000';
   }
 }
