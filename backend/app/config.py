@@ -86,12 +86,12 @@ class Settings:
 	# Lead Management
 	AUTO_ASSIGN_LEADS: bool = os.getenv("AUTO_ASSIGN_LEADS", "false").lower() == "true"
 	LEAD_ASSIGNMENT_STRATEGY: str = os.getenv("LEAD_ASSIGNMENT_STRATEGY", "round_robin")  # round_robin, load_balance, manual
-	URGENT_LEAD_THRESHOLD: int = int(os.getenv("URGENT_LEAD_THRESHOLD", "24"))  # hours
+	TIME_SENSITIVE_LEAD_THRESHOLD: int = int(os.getenv("TIME_SENSITIVE_LEAD_THRESHOLD", "24"))  # hours
 	
 	# Notification Settings
 	NOTIFY_ON_NEW_LEAD: bool = os.getenv("NOTIFY_ON_NEW_LEAD", "true").lower() == "true"
 	NOTIFY_ON_LEAD_UPDATE: bool = os.getenv("NOTIFY_ON_LEAD_UPDATE", "true").lower() == "true"
-	NOTIFY_ON_URGENT_LEAD: bool = os.getenv("NOTIFY_ON_URGENT_LEAD", "true").lower() == "true"
+	NOTIFY_ON_TIME_SENSITIVE_LEAD: bool = os.getenv("NOTIFY_ON_TIME_SENSITIVE_LEAD", "true").lower() == "true"
 	DAILY_SUMMARY_TIME: str = os.getenv("DAILY_SUMMARY_TIME", "09:00")  # 24-hour format
 	
 	# Hybrid Search Configuration

@@ -31,7 +31,7 @@ class FunctionHandler:
             
     def handle_contact_request(self, session_id: str, **kwargs) -> Dict[str, Any]:
         """
-        Smart contact request handler - detects both lead opportunities and urgent contact needs
+        Smart contact request handler - detects both lead opportunities and time-sensitive contact needs
         """
         try:
             user_query = kwargs.get('user_query', '').lower()
@@ -71,11 +71,11 @@ class FunctionHandler:
                 "when should i", "what's the timeline", "deadline"
             ]
             
-            # URGENCY detection keywords (immediate human contact needed)
+            # TIME-SENSITIVE detection keywords (immediate human contact needed)
             urgency_keywords = [
-                "urgent", "critical", "extreme", "immediate", "now",
+                "urgent", "important", "time-sensitive", "immediate", "now",
                 "talk to someone", "need help now", "call me now", "immediately",
-                "asap", "right now", "this instant", "critical", "desperate"
+                "asap", "right now", "this instant", "important", "high priority"
             ]
             
             # Check if user shows serious interest OR urgency
@@ -87,8 +87,8 @@ class FunctionHandler:
             has_contact = session_info and (session_info.email or session_info.phone)
             
             if shows_urgency:
-                # URGENT CONTACT NEEDED - Give AI Consultancy number immediately
-                urgency_level = "extreme" if any(word in user_query for word in ["critical", "extreme", "desperate"]) else "urgent"
+                # TIME-SENSITIVE CONTACT NEEDED - Give AI Consultancy number immediately
+                urgency_level = "high" if any(word in user_query for word in ["important", "time-sensitive", "high priority"]) else "urgent"
                 contact_preference = "call" if "call" in user_query else "any"
                 
                 message = f"🚨 I understand this is {urgency_level}! Here's our direct contact:\n\n📞 **AI Consultancy**: {AI_CONSULTANCY_NUMBERS['urgent']}\n📱 **WhatsApp**: {AI_CONSULTANCY_NUMBERS['whatsapp']}\n🏢 **Office**: {AI_CONSULTANCY_NUMBERS['office']}\n\n**Someone from our team will call you immediately!** Please share your phone number so we can reach you right away."

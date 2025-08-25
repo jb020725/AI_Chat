@@ -71,7 +71,7 @@ def setup_clean_logging(
     main_handler.set_name("main_app")
     root_logger.addHandler(main_handler)
     
-    # Error log (only errors and critical)
+    # Error log (only errors and important)
     error_log_file = log_dir / "errors.log"
     error_handler = logging.handlers.RotatingFileHandler(
         error_log_file,

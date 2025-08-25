@@ -418,5 +418,5 @@ class LeadCaptureTool:
                 "session_id", "tenant_id", "created_at"
             ],
             "lead_statuses": ["new", "contacted", "qualified", "converted", "lost"],
-            "urgency_levels": ["low", "normal", "high", "urgent"]
+            "urgency_levels": ["low", "normal", "high", "time-sensitive"]
         }

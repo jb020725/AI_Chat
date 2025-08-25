@@ -249,7 +249,7 @@ class SmartResponseGenerator:
             if function_result.get('message'):
                 prompt_parts.append(f"Function Message: {function_result['message']}")
             
-            # CRITICAL: Handle function failures gracefully
+            # IMPORTANT: Handle function failures gracefully
             if function_result.get('success') == False:
                 prompt_parts.append("\n⚠️ FUNCTION FAILED - Generate helpful response:")
                 prompt_parts.append("1. Acknowledge what the user asked for")

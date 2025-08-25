@@ -162,7 +162,7 @@ REDIRECT: Non-student visa questions to student visa services"""
         """Build the response guidelines and follow-up instructions"""
         return """FUNCTION CALLING RULES:
 1. When user provides contact info (name, email, phone) → call detect_and_save_contact_info
-2. When user shows serious interest/urgency → call handle_contact_request  
+2. When user shows serious interest/time-sensitive needs → call handle_contact_request  
 3. When RAG has no results → call define_response_strategy
 
 RESPONSE RULES:

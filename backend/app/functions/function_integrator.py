@@ -87,7 +87,7 @@ class FunctionIntegrator:
                         top_p=0.8,
                         top_k=40
                     ),
-                    tools=self.function_declarations
+                    tools=[{"function_declarations": self.function_declarations}]
                 )
             except Exception as e:
                 self.logger.warning(f"New function calling format failed: {e}")
@@ -226,14 +226,14 @@ Please provide a natural, helpful response to the user based on the function res
             # Function descriptions
             prompt_parts.append("AVAILABLE FUNCTIONS:")
             prompt_parts.append("")
-            prompt_parts.append("[ALERT] FUNCTION CALLING RULES:")
+            prompt_parts.append("FUNCTION CALLING RULES:")
     
-            prompt_parts.append("- If user shows serious intent (wants to apply, needs guidance) OR shows urgency (critical, immediate help), call handle_contact_request")
+            prompt_parts.append("- If user shows serious intent (wants to apply, needs guidance) OR shows time-sensitive needs (immediate help), call handle_contact_request")
             prompt_parts.append("- If RAG has no results, call define_response_strategy to determine how to respond")
     
             prompt_parts.append("")
             
-            prompt_parts.append("1. handle_contact_request(user_query, conversation_context, detected_interests?) - Smart contact handler for both lead opportunities (serious intent) and urgent contact needs (critical, immediate help). Routes appropriately based on urgency level.")
+            prompt_parts.append("1. handle_contact_request(user_query, conversation_context, detected_interests?) - Smart contact handler for both lead opportunities (serious intent) and time-sensitive contact needs (immediate help). Routes appropriately based on urgency level.")
             prompt_parts.append("2. detect_and_save_contact_info(user_query, conversation_context, extraction_mode?) - Automatically detect, extract, and save contact information from user messages. Use when user provides any contact details.")
             prompt_parts.append("3. define_response_strategy(user_query, rag_results_count, session_memory?) - Define response strategy when RAG has no results. Use when RAG returns 0 results.")
             prompt_parts.append("")
@@ -244,14 +244,14 @@ Please provide a natural, helpful response to the user based on the function res
     
             prompt_parts.append("")
             
-            prompt_parts.append("CRITICAL RULES:")
+            prompt_parts.append("IMPORTANT RULES:")
     
-            prompt_parts.append("- MANDATORY: When user shows serious intent (wants to apply, needs guidance) OR shows urgency (critical, immediate help), call handle_contact_request")
-            prompt_parts.append("- MANDATORY: When user provides ANY contact information (name, email, phone, country, intake), call detect_and_save_contact_info to automatically extract and save it")
-            prompt_parts.append("- MANDATORY: If RAG has no results, call define_response_strategy to determine how to respond")
+            prompt_parts.append("- WHEN TO CALL: When user shows serious intent (wants to apply, needs guidance) OR shows time-sensitive needs (immediate help), call handle_contact_request")
+            prompt_parts.append("- WHEN TO CALL: When user provides ANY contact information (name, email, phone, country, intake), call detect_and_save_contact_info to automatically extract and save it")
+            prompt_parts.append("- WHEN TO CALL: If RAG has no results, call define_response_strategy to determine how to respond")
     
             prompt_parts.append("- RESPONSE STRATEGIES: Follow the strategy defined by define_response_strategy function exactly")
-            prompt_parts.append("- LEAD GENERATION: Always detect opportunities to collect contact information when users show serious intent")
+            prompt_parts.append("- CONTACT COLLECTION: Always detect opportunities to collect contact information when users show serious intent")
             prompt_parts.append("")
             
             # User message
@@ -270,7 +270,7 @@ Please provide a natural, helpful response to the user based on the function res
                 has_phone = True
             
             if has_email or has_name or has_phone:
-                prompt_parts.append("[ALERT] CONTACT INFO DETECTED: Call detect_and_save_contact_info function to automatically extract and save the information!")
+                prompt_parts.append("NOTE: CONTACT INFO DETECTED: Call detect_and_save_contact_info function to automatically extract and save the information!")
                 prompt_parts.append("")
             
             # Conversation history

@@ -86,21 +86,21 @@ def _build() -> PathConfig:
         DATABASE_FILE=database_file
     )
     
-    # Ensure critical directories exist
+    # Ensure important directories exist
     _ensure_directories(cfg)
     
     return cfg
 
 def _ensure_directories(cfg: PathConfig) -> None:
-    """Ensure critical directories exist"""
-    critical_dirs = [
+    """Ensure important directories exist"""
+    important_dirs = [
         cfg.DATA_DIR,
         cfg.INDEX_DIR,
         cfg.LOGS_DIR,
         cfg.CONFIG_DIR
     ]
     
-    for directory in critical_dirs:
+    for directory in important_dirs:
         directory.mkdir(parents=True, exist_ok=True)
 
 # Global configuration instance
