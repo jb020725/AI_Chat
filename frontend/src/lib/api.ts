@@ -1,5 +1,5 @@
 // src/lib/api.ts
-import { config, getApiUrl } from './config';
+import { config, getApiUrl, getBackendUrl } from './config';
 
 export type Source = { title: string; url?: string; chunk_id: string };
 
@@ -83,8 +83,8 @@ class APIClient {
   
   private determineBaseUrl(): string {
     if (config.isProduction) {
-      // Production: use the deployed backend URL
-      return 'https://ai-chatbot-backend-irsvqln4dq-uc.a.run.app';
+      // Production: use dynamic backend URL detection
+      return getBackendUrl();
     } else {
       // Development: use proxy (no base URL needed)
       return '';
