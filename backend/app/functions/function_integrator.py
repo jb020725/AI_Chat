@@ -85,7 +85,7 @@ class FunctionIntegrator:
                     top_p=0.8,
                     top_k=40
                 ),
-                tools=[{"function_declarations": self.function_declarations}]
+                tools=self.function_declarations
             )
             
             # Debug: Log the raw response structure
