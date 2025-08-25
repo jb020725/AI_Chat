@@ -173,6 +173,9 @@ class SessionMemory:
             url = settings.SUPABASE_URL
             key = settings.SUPABASE_SERVICE_ROLE_KEY
             
+            logger.info(f"🔍 Debug: Supabase URL = '{url}'")
+            logger.info(f"🔍 Debug: Supabase Key length = {len(key) if key else 0}")
+            
             if not url or not key:
                 logger.warning("Supabase credentials not found - sessions will only be stored in memory")
                 return
