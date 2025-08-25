@@ -99,13 +99,13 @@ class FunctionIntegrator:
                     response._no_function_calling = True
                 except Exception as fallback_error:
                     self.logger.error(f"Fallback generation also failed: {fallback_error}")
-                                                              # Return a basic response
-                     return {
-                         "llm_response": "I am unable to process request for this question, please move on if you have any other questions.",
-                         "function_calls": [],
-                         "processing_successful": False,
-                         "error": str(fallback_error)
-                     }
+                    # Return a basic response
+                    return {
+                        "llm_response": "I am unable to process request for this question, please move on if you have any other questions.",
+                        "function_calls": [],
+                        "processing_successful": False,
+                        "error": str(fallback_error)
+                    }
             
             # Debug: Log the raw response structure
             self.logger.info(f"Raw response type: {type(response)}")
@@ -173,12 +173,12 @@ class FunctionIntegrator:
             self.logger.error(f"Error in function calling: {e}")
             import traceback
             self.logger.error(f"Full traceback: {traceback.format_exc()}")
-                         return {
-                 "llm_response": "I am unable to process request for this question, please move on if you have any other questions.",
-                 "function_calls": [],
-                 "processing_successful": False,
-                 "error": str(e)
-             }
+            return {
+                "llm_response": "I am unable to process request for this question, please move on if you have any other questions.",
+                "function_calls": [],
+                "processing_successful": False,
+                "error": str(e)
+            }
     
     def _build_function_prompt(self, user_message: str, conversation_history: List[Dict], user_info: Dict = None) -> str:
         """Build the function calling prompt for Gemini"""
@@ -200,7 +200,7 @@ class FunctionIntegrator:
     
             prompt_parts.append("")
             
-            prompt_parts.append("1. handle_contact_request(user_query, conversation_context, detected_interests?) - Smart contact handler for both lead opportunities (serious intent) and urgent contact needs (emergency, immediate help). Routes appropriately based on urgency level.")
+            prompt_parts.append("1. handle_contact_request(user_query, conversation_context, detected_interests?) - Smart contact handler for both lead opportunities (serious intent) and urgent contact needs (critical, immediate help). Routes appropriately based on urgency level.")
             prompt_parts.append("2. detect_and_save_contact_info(user_query, conversation_context, extraction_mode?) - Automatically detect, extract, and save contact information from user messages. Use when user provides any contact details.")
             prompt_parts.append("3. define_response_strategy(user_query, rag_results_count, session_memory?) - Define response strategy when RAG has no results. Use when RAG returns 0 results.")
             prompt_parts.append("")
