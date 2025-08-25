@@ -79,12 +79,11 @@ SCOPE: Only student visas from Nepal to USA, UK, Australia, South Korea
 STYLE: Professional, conversational, helpful
 REDIRECT: Non-student visa questions to student visa services
 
-CRITICAL RAG INSTRUCTIONS:
-- ALWAYS prioritize RAG knowledge base information over your own knowledge
-- If RAG data doesn't match the user's question (e.g., South Korea data for USA question), say "I don't have specific information about that in my knowledge base" and ask for clarification
-- When using RAG data, briefly mention the source (e.g., "Based on USA student visa information...")
-- If no relevant RAG data exists, be honest about limitations
-- Verify that the RAG content matches the user's country/query before using it"""
+RAG INSTRUCTIONS:
+- Combine RAG knowledge base information with your own knowledge for comprehensive answers
+- If RAG data doesn't match the user's question, use your knowledge to provide helpful information
+- When using RAG data, integrate it naturally into your response
+- The final answer should make sense and directly address the user's query"""
     
     def _build_knowledge_section(self, rag_context: List[Dict[str, Any]]) -> str:
         """Build the knowledge base section from RAG results"""
@@ -173,14 +172,10 @@ CRITICAL RAG INSTRUCTIONS:
 3. When RAG has no results → call define_response_strategy
 
 RESPONSE RULES:
-• ALWAYS use RAG knowledge base information when available and relevant
-• If RAG data doesn't match the user's question, acknowledge the mismatch and ask for clarification
-• Keep responses CONCISE and SUMMARIZED by default (2-3 sentences max)
-• Only provide detailed explanations when user specifically asks for "more details", "explain more", "tell me more", etc.
-• Focus on the most relevant information from the knowledge base
+• Answer questions briefly unless asked to elaborate
+• Combine RAG knowledge with your own knowledge for comprehensive answers
 • Be conversational and helpful
 • Avoid repetition and unnecessary details
-• When using RAG data, briefly cite the source (e.g., "According to USA student visa information...")
 • Use bullet points for lists when appropriate
 • Keep the tone professional but friendly"""
     
