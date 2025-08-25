@@ -323,11 +323,11 @@ class FunctionHandler:
                 should_ask_for_contact = True
                 missing_contact_type = "email"
             
-            # Only save as lead if we have complete info AND we're not asking for contact
-            if current_name and current_phone and current_email and not should_ask_for_contact:
+            # IMPROVED: Save lead with partial contact info (name + email OR phone)
+            if current_name and (current_phone or current_email) and not should_ask_for_contact:
                 # Determine contact method for message
-                contact_method = "phone" if extracted_data.get('phone') else "email"
-                contact_value = extracted_data.get('phone') or extracted_data.get('email')
+                contact_method = "phone" if current_phone else "email"
+                contact_value = current_phone or current_email
                 
                 lead_data = {
                     "session_id": session_id,
@@ -344,7 +344,7 @@ class FunctionHandler:
                 
                 if lead_result.get('success'):
                     lead_id = lead_result.get('lead_id', f"lead_{session_id}")
-                    self.logger.info(f"Contact info automatically saved as lead: {lead_id}")
+                    self.logger.info(f"✅ Contact info saved as lead: {lead_id}")
                     
                     return {
                         "success": True,
@@ -352,7 +352,7 @@ class FunctionHandler:
                             "extracted": True,
                             "saved_as_lead": True,
                             "lead_id": lead_id,
-                            "message": f"Perfect! I've saved your complete information: {current_name}, {current_phone or current_email}. You're all set!",
+                            "message": f"Perfect! I've saved your information: {current_name}. You're all set!",
                             "extracted_data": extracted_data,
                             "session_info": session_info.__dict__ if session_info else None,
                             "combined_data": {
@@ -364,7 +364,8 @@ class FunctionHandler:
                         }
                     }
                 else:
-                    self.logger.error(f"Failed to save lead automatically: {lead_result.get('error')}")
+                    self.logger.error(f"❌ Failed to save lead: {lead_result.get('error')}")
+                    # Continue to update session even if lead save fails
             
             # If we don't have complete lead info, update session and potentially ask for contact
             response_data = {

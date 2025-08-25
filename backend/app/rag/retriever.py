@@ -51,9 +51,43 @@ class DocumentRetriever:
             logger.error(f"Error initializing retriever: {e}")
             self.documents = []
     
+    def _detect_country_from_query(self, query: str) -> Optional[str]:
+        """Detect country from user query using smart keyword matching"""
+        query_lower = query.lower()
+        
+        # Comprehensive country detection keywords
+        country_keywords = {
+            'usa': ['usa', 'united states', 'america', 'us', 'u.s.', 'u.s.a', 'f-1', 'f1', 'student visa usa', 'american'],
+            'uk': ['uk', 'united kingdom', 'britain', 'england', 'tier 4', 'tier4', 'student visa uk', 'british'],
+            'australia': ['australia', 'aussie', 'subclass 500', 'student visa australia', 'australian'],
+            'south korea': ['south korea', 'korea', 'korean', 'd-2', 'd-4', 'd2', 'd4', 'student visa korea', 'korean student']
+        }
+        
+        # Check for exact country matches first
+        for country, keywords in country_keywords.items():
+            if any(keyword in query_lower for keyword in keywords):
+                logger.info(f"🔍 Detected country '{country}' from query: '{query}'")
+                return country
+        
+        # If no direct match, check for visa type patterns
+        visa_patterns = {
+            'usa': ['f-1', 'f1'],
+            'uk': ['tier 4', 'tier4'],
+            'australia': ['subclass 500'],
+            'south korea': ['d-2', 'd-4', 'd2', 'd4']
+        }
+        
+        for country, patterns in visa_patterns.items():
+            if any(pattern in query_lower for pattern in patterns):
+                logger.info(f"🔍 Detected country '{country}' from visa pattern: '{query}'")
+                return country
+        
+        logger.info(f"❓ No country detected from query: '{query}'")
+        return None
+    
     def search(self, query: str, top_k: int = 3, country: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        Search documents for relevant content
+        Search documents for relevant content with smart country detection
         Args:
             query: Search query
             top_k: Number of results to return
@@ -68,6 +102,12 @@ class DocumentRetriever:
             logger.warning("No documents loaded for search")
             return []
         
+        # SMART COUNTRY DETECTION
+        detected_country = self._detect_country_from_query(query)
+        if detected_country and not country:
+            country = detected_country
+            logger.info(f"🎯 Using detected country: {country}")
+        
         # Try vector search first
         if self.embedder.is_available() and hasattr(self.embedder, 'index') and self.embedder.index is not None:
             results = self._vector_search(query, top_k, country)
@@ -78,10 +118,10 @@ class DocumentRetriever:
         return self._keyword_search(query, top_k, country)
     
     def _vector_search(self, query: str, top_k: int, country: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Perform vector similarity search"""
+        """Perform vector similarity search with country filtering"""
         try:
             # Search using the embedder's search method
-            search_results = self.embedder.search(query, top_k * 2)  # Get more for filtering
+            search_results = self.embedder.search(query, top_k * 3)  # Get more for filtering
             
             if not search_results:
                 return []
@@ -89,23 +129,29 @@ class DocumentRetriever:
             # Format results
             results = []
             for doc in search_results:
+                # Extract country from document metadata
+                doc_country = doc.get('country', '')
+                if not doc_country and 'meta' in doc:
+                    doc_country = doc['meta'].get('country', '')
+                
                 # Filter by country if specified
-                if country and doc.get('country', '').lower() != country.lower():
+                if country and doc_country.lower() != country.lower():
+                    logger.debug(f"�� Filtering out {doc_country} document for {country} query")
                     continue
                 
                 results.append({
                     'document': doc,
-                    'score': doc.get('similarity_score', 0.0),
+                    'score': doc.get('score', 0.0),
                     'title': doc.get('title', doc.get('source_file', 'Unknown')),
                     'content': doc.get('content', doc.get('text', '')),
-                    'country': doc.get('country', ''),
+                    'country': doc_country,
                     'source': doc.get('source_file', '')
                 })
                 
                 if len(results) >= top_k:
                     break
             
-            logger.info(f"Vector search for '{query}' returned {len(results)} results")
+            logger.info(f"✅ Vector search for '{query}' (country: {country}) returned {len(results)} results")
             return results
             
         except Exception as e:
