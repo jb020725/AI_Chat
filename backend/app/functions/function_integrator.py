@@ -440,6 +440,18 @@ class FunctionIntegrator:
                                 if function_result.get('success', False):
                                     self.logger.info(f"Function {function_name} succeeded - generating natural response")
                                     
+                                    # Check if we need to ask for contact info
+                                    function_data = function_result.get('data', {})
+                                    ask_for_contact = function_data.get('ask_for_contact', False)
+                                    contact_message = function_data.get('contact_message', '')
+                                    
+                                    if ask_for_contact and contact_message:
+                                        # Use the pre-defined contact message
+                                        result["llm_response"] = contact_message
+                                        self.logger.info(f"Using contact message: {contact_message}")
+                                        # Skip natural response generation since we have a specific message
+                                        continue
+                                    
                                     # Create a simple, natural prompt for the LLM to respond
                                     natural_prompt = f"""You are a helpful visa consultant for AI Consultancy.
 

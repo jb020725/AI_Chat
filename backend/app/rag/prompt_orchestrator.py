@@ -166,11 +166,14 @@ REDIRECT: Non-student visa questions to student visa services"""
 3. When RAG has no results → call define_response_strategy
 
 RESPONSE RULES:
-• Answer student visa questions using knowledge base
-• Redirect non-student visa questions
-• Be conversational, avoid repetition
-• Check conversation history
-• Keep responses focused and helpful"""
+• Keep responses CONCISE and SUMMARIZED by default (2-3 sentences max)
+• Only provide detailed explanations when user specifically asks for "more details", "explain more", "tell me more", etc.
+• Focus on the most relevant information from the knowledge base
+• Be conversational and helpful
+• Avoid repetition and unnecessary details
+• If user asks for specific details, then provide them
+• Use bullet points for lists when appropriate
+• Keep the tone professional but friendly"""
     
     def get_prompt_metadata(self) -> Dict[str, Any]:
         """Get metadata about the prompt orchestrator"""

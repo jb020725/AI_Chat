@@ -138,7 +138,20 @@ class SmartResponseGenerator:
                 content = first_result.get('content', '')
                 title = first_result.get('title', '')
                 
-                return f"Based on the information I have: {content[:200]}... For more detailed guidance, please contact our team."
+                # Extract the most relevant information and keep it concise
+                if len(content) > 100:
+                    # Take the first sentence or first 100 characters
+                    sentences = content.split('.')
+                    if sentences and sentences[0]:
+                        summary = sentences[0].strip()
+                        if len(summary) > 100:
+                            summary = summary[:100] + "..."
+                    else:
+                        summary = content[:100] + "..."
+                else:
+                    summary = content
+                
+                return f"Based on the information I have: {summary} For more details, just ask!"
             else:
                 return "I have some information about that. Please contact our team for detailed guidance."
         except Exception as e:
@@ -181,16 +194,16 @@ class SmartResponseGenerator:
         
         # Check for specific patterns and provide appropriate responses
         if any(word in message_lower for word in ['contact', 'phone', 'number', 'call', 'reach']):
-            return "I'd be happy to connect you with our team! Please provide your contact information (name, email, and phone number) so we can reach out to you with personalized guidance."
+            return "I'd be happy to connect you with our team! Please share your contact information (name, email, phone) so we can reach out."
         
         elif any(word in message_lower for word in ['apply', 'application', 'process']):
-            return "I can help you with the application process! To provide you with the most accurate guidance, could you share your contact details and let me know which country you're interested in studying in?"
+            return "I can help with the application process! Please share your contact details and preferred country for personalized guidance."
         
         elif any(word in message_lower for word in ['requirements', 'documents', 'needed']):
-            return "I can help you understand the requirements! To give you specific guidance, please share your contact information and tell me which country you're planning to study in."
+            return "I can help with requirements! Please share your contact info and target country for specific guidance."
         
         else:
-            return "I can help you with student visa information! To provide personalized guidance, please share your contact details and let me know which country you're interested in."
+            return "I can help with student visa information! Please share your contact details and preferred country."
 
     def _generate_out_of_domain_response(self, domain_check: Dict) -> str:
         """Generate response for out-of-domain queries"""
@@ -199,10 +212,10 @@ class SmartResponseGenerator:
         
         if confidence > 0.8:
             # High confidence out-of-domain
-            return "I specialize in student visas for USA, UK, Australia, and South Korea. Your question appears to be outside my area of expertise. For general questions, I recommend using a general AI assistant like ChatGPT or Google's Gemini."
+            return "I specialize in student visas for USA, UK, Australia, and South Korea. For general questions, I recommend using ChatGPT or Google's Gemini."
         else:
             # Lower confidence - try to redirect to student visa topics
-            return "I specialize in student visa guidance for USA, UK, Australia, and South Korea. If you have questions about studying abroad, I'd be happy to help! Otherwise, for general questions, I recommend using a general AI assistant."
+            return "I specialize in student visa guidance for USA, UK, Australia, and South Korea. If you have questions about studying abroad, I'd be happy to help!"
 
     def _create_tool_response_prompt(self, user_message: str, function_name: str, 
                                     function_result: Dict, conversation_history: List[Dict]) -> str:
@@ -215,13 +228,13 @@ class SmartResponseGenerator:
             prompt_parts.append("A function has been executed successfully. Generate a natural, helpful response.")
             prompt_parts.append("")
             prompt_parts.append("SYSTEM POLICY RULES:")
-            
-            prompt_parts.append("2. Ask for lead fields only after you've helped OR user shows interest; ask 1-2 max with explicit opt-in")
-            
-            
+            prompt_parts.append("1. Keep responses CONCISE and SUMMARIZED (2-3 sentences max)")
+            prompt_parts.append("2. Only provide detailed explanations when user specifically asks for 'more details', 'explain more', etc.")
+            prompt_parts.append("3. Ask for lead fields only after you've helped OR user shows interest; ask 1-2 max with explicit opt-in")
+            prompt_parts.append("4. Be conversational and natural - don't be overly formal")
             prompt_parts.append("5. If no KB match above threshold, say what's missing and ask a disambiguating question")
-            prompt_parts.append("6. Be conversational and natural - don't be overly formal")
-            prompt_parts.append("7. Keep responses concise and helpful")
+            prompt_parts.append("6. Focus on the most relevant information")
+            prompt_parts.append("7. Avoid repetition and unnecessary details")
             prompt_parts.append("")
             
             # User's original question
@@ -259,17 +272,18 @@ class SmartResponseGenerator:
 
             elif function_name == "detect_and_save_contact_info":
                 prompt_parts.append("\nInstructions:")
-                prompt_parts.append("1. Acknowledge what information was automatically detected and saved")
-                prompt_parts.append("2. Confirm the information was recorded correctly")
-                prompt_parts.append("3. Continue helping with the user's questions naturally")
-                prompt_parts.append("4. Be brief and conversational")
+                prompt_parts.append("1. Briefly acknowledge the information was saved")
+                prompt_parts.append("2. Continue helping with the user's questions naturally")
+                prompt_parts.append("3. Keep response concise (1-2 sentences)")
+                prompt_parts.append("4. Be conversational and helpful")
                 
 
             else:
                 prompt_parts.append("\nInstructions:")
-                prompt_parts.append("1. Acknowledge the function was successful")
+                prompt_parts.append("1. Briefly acknowledge the function was successful")
                 prompt_parts.append("2. Continue helping the user naturally")
-                prompt_parts.append("3. Keep the conversation flowing")
+                prompt_parts.append("3. Keep response concise (1-2 sentences)")
+                prompt_parts.append("4. Be conversational and helpful")
             
             return "\n".join(prompt_parts)
             

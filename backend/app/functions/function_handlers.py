@@ -349,16 +349,47 @@ class FunctionHandler:
                 else:
                     self.logger.error(f"Failed to save lead automatically: {lead_result.get('error')}")
             
-            # If we don't have complete lead info, just update session
+            # Check if we should ask for missing contact info
+            should_ask_for_contact = False
+            missing_contact_type = None
+            
+            # If we have a name but missing both email and phone, ask for contact
+            if current_name and not current_phone and not current_email:
+                should_ask_for_contact = True
+                missing_contact_type = "email_or_phone"
+            # If we have name and email but no phone, ask for phone
+            elif current_name and current_email and not current_phone:
+                should_ask_for_contact = True
+                missing_contact_type = "phone"
+            # If we have name and phone but no email, ask for email
+            elif current_name and current_phone and not current_email:
+                should_ask_for_contact = True
+                missing_contact_type = "email"
+            
+            # If we don't have complete lead info, update session and potentially ask for contact
+            response_data = {
+                "extracted": True,
+                "saved_as_lead": False,
+                "extracted_data": extracted_data,
+                "session_info": session_info.__dict__ if session_info else None
+            }
+            
+            if should_ask_for_contact:
+                if missing_contact_type == "email_or_phone":
+                    response_data["ask_for_contact"] = True
+                    response_data["contact_message"] = "Great! I have your name saved. To help you better with your student visa journey, would you like to share your email address or phone number so our AI Consultancy can assist you?"
+                elif missing_contact_type == "phone":
+                    response_data["ask_for_contact"] = True
+                    response_data["contact_message"] = "Perfect! I have your name and email. To provide you with the best assistance, would you like to share your phone number as well?"
+                elif missing_contact_type == "email":
+                    response_data["ask_for_contact"] = True
+                    response_data["contact_message"] = "Great! I have your name and phone number. To help you better, would you like to share your email address as well?"
+            else:
+                response_data["message"] = f"I've updated your information with: {', '.join([f'{k}: {v}' for k, v in extracted_data.items() if v])}"
+            
             return {
                 "success": True,
-                "data": {
-                    "extracted": True,
-                    "saved_as_lead": False,
-                    "message": f"I've updated your information with: {', '.join([f'{k}: {v}' for k, v in extracted_data.items() if v])}",
-                    "extracted_data": extracted_data,
-                    "session_info": session_info.__dict__ if session_info else None
-                }
+                "data": response_data
             }
             
         except Exception as e:
