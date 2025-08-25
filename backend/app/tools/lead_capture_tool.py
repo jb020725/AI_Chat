@@ -75,7 +75,7 @@ class LeadCaptureTool:
         try:
             # Get Supabase credentials from config
             url = self.config.get("supabase_url") or settings.SUPABASE_URL
-            key = self.config.get("supabase_key") or settings.SUPABASE_SERVICE_ROLE_KEY
+            key = self.config.get("supabase_service_role_key") or settings.SUPABASE_SERVICE_ROLE_KEY
             
             if not url or not key:
                 logger.warning("Supabase credentials not found. Using mock mode.")
