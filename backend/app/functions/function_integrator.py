@@ -78,20 +78,64 @@ class FunctionIntegrator:
             self.logger.info(f"Processing with function calling for session {session_id}")
             
             # Call Gemini with function calling
-            response = self.llm_model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.7,
-                    top_p=0.8,
-                    top_k=40
-                ),
-                tools=self.function_declarations
-            )
+            try:
+                # Try the new format first
+                response = self.llm_model.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.7,
+                        top_p=0.8,
+                        top_k=40
+                    ),
+                    tools=self.function_declarations
+                )
+            except Exception as e:
+                self.logger.warning(f"New function calling format failed: {e}")
+                # Fallback to basic generation without function calling
+                self.logger.info("Falling back to basic generation without function calling")
+                response = self.llm_model.generate_content(prompt)
+                # Mark that no functions were called
+                response._no_function_calling = True
             
             # Debug: Log the raw response structure
             self.logger.info(f"Raw response type: {type(response)}")
             self.logger.info(f"Raw response attributes: {dir(response)}")
             self.logger.info(f"Response has candidates: {hasattr(response, 'candidates')}")
+            
+            # Check if function calling failed and we're using fallback
+            if hasattr(response, '_no_function_calling'):
+                self.logger.info("Using fallback response processing (no function calling)")
+                
+                # Try to parse function calls from the text response
+                llm_text = response.text if hasattr(response, 'text') else str(response)
+                parsed_functions = self._parse_function_calls_from_text(llm_text)
+                
+                if parsed_functions:
+                    self.logger.info(f"Found {len(parsed_functions)} function calls in text response")
+                    # Execute the parsed functions
+                    executed_functions = []
+                    for func_call in parsed_functions:
+                        try:
+                            result = self._execute_parsed_function(func_call, session_id)
+                            executed_functions.append(result)
+                        except Exception as e:
+                            self.logger.error(f"Failed to execute parsed function {func_call}: {e}")
+                    
+                    return {
+                        "llm_response": llm_text,
+                        "function_calls": executed_functions,
+                        "processing_successful": True,
+                        "fallback_mode": True,
+                        "parsed_functions": True
+                    }
+                
+                return {
+                    "llm_response": llm_text,
+                    "function_calls": [],
+                    "processing_successful": True,
+                    "fallback_mode": True
+                }
+            
             if hasattr(response, 'candidates') and response.candidates:
                 self.logger.info(f"First candidate type: {type(response.candidates[0])}")
                 self.logger.info(f"First candidate attributes: {dir(response.candidates[0])}")
@@ -103,6 +147,8 @@ class FunctionIntegrator:
             
         except Exception as e:
             self.logger.error(f"Error in function calling: {e}")
+            import traceback
+            self.logger.error(f"Full traceback: {traceback.format_exc()}")
             return {
                 "llm_response": f"I encountered an error processing your request. Please try again.",
                 "function_calls": [],
@@ -454,6 +500,87 @@ For example, if someone asks about an unsupported country, say: "I'm sorry, but 
                 "function_calls": [],
                 "processing_successful": False,
                 "error": str(e)
+            }
+    
+    def _parse_function_calls_from_text(self, text: str) -> List[Dict[str, Any]]:
+        """Parse function calls from LLM text response"""
+        import re
+        
+        function_calls = []
+        
+        # Look for function call patterns in the text
+        # Pattern: function_name(param1="value1", param2="value2")
+        pattern = r'(\w+)\(([^)]+)\)'
+        
+        matches = re.findall(pattern, text)
+        
+        for func_name, params_str in matches:
+            try:
+                # Parse parameters
+                params = {}
+                if params_str.strip():
+                    # Split by comma and parse each parameter
+                    param_parts = params_str.split(',')
+                    for part in param_parts:
+                        if '=' in part:
+                            key, value = part.split('=', 1)
+                            key = key.strip()
+                            value = value.strip().strip('"\'')
+                            
+                            # Convert value types
+                            if value.lower() in ['true', 'false']:
+                                value = value.lower() == 'true'
+                            elif value.isdigit():
+                                value = int(value)
+                            elif value.startswith('{') and value.endswith('}'):
+                                # Try to parse as dict
+                                try:
+                                    import ast
+                                    value = ast.literal_eval(value)
+                                except:
+                                    pass
+                            
+                            params[key] = value
+                
+                function_calls.append({
+                    "function_name": func_name,
+                    "arguments": params
+                })
+                
+            except Exception as e:
+                self.logger.warning(f"Failed to parse function call {func_name}: {e}")
+                continue
+        
+        return function_calls
+    
+    def _execute_parsed_function(self, func_call: Dict[str, Any], session_id: str) -> Dict[str, Any]:
+        """Execute a parsed function call"""
+        try:
+            func_name = func_call.get("function_name")
+            arguments = func_call.get("arguments", {})
+            
+            if not func_name:
+                return {"success": False, "error": "No function name"}
+            
+            # Execute the function using the function handler
+            from .function_handlers import function_handler
+            
+            result = function_handler.execute_function(func_name, session_id, **arguments)
+            
+            return {
+                "function_name": func_name,
+                "arguments": arguments,
+                "result": result,
+                "success": True
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Failed to execute parsed function {func_call}: {e}")
+            return {
+                "function_name": func_call.get("function_name", "unknown"),
+                "arguments": func_call.get("arguments", {}),
+                "error": str(e),
+                "success": False
             }
     
     def _create_tool_response_prompt(self, user_message: str, function_name: str, 

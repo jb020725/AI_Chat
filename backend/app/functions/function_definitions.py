@@ -8,10 +8,6 @@ Defines the schema for functions that the LLM can call to:
 """
 
 FUNCTIONS = [
-
-
-
-
     {
         "name": "handle_contact_request",
         "description": "Smart contact request handler that detects both lead opportunities and urgent contact needs. Use when user shows serious intent (wants to apply, needs guidance) OR shows extreme urgency (needs immediate call, emergency situation).",
@@ -84,9 +80,7 @@ FUNCTIONS = [
             },
             "required": ["user_query", "rag_results_count"]
         }
-    },
-
-
+    }
 ]
 
 # Function metadata for easier access
