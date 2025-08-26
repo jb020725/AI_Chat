@@ -30,10 +30,18 @@ class EmailTool:
         self.from_name = self.config.get("from_name") or settings.FROM_NAME
         
         # Check if email is configured
-        self.email_configured = bool(self.username and self.password and self.from_email)
+        self.email_configured = bool(
+            self.smtp_server and 
+            self.smtp_port and 
+            self.username and 
+            self.password and 
+            self.from_email
+        )
         
         if not self.email_configured:
-            logger.warning("Email not configured - notifications will be logged only")
+            logger.warning(f"📧 EMAIL DEBUG: Email not configured - missing: server={bool(self.smtp_server)}, port={bool(self.smtp_port)}, username={bool(self.username)}, password={bool(self.password)}, from_email={bool(self.from_email)}")
+        else:
+            logger.info(f"📧 EMAIL DEBUG: Email configured successfully - server: {self.smtp_server}:{self.smtp_port}")
     
     @staticmethod
     def configured() -> bool:

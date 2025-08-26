@@ -60,7 +60,7 @@ class Settings:
 	SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
 	SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
 	FROM_EMAIL: str = os.getenv("FROM_EMAIL", "")
-	FROM_NAME: str = os.getenv("FROM_EMAIL", "Visa Consultation Bot")
+	FROM_NAME: str = os.getenv("FROM_NAME", "Visa Consultation Bot")
 	
 	# Lead Notification Settings
 	LEAD_NOTIFICATION_EMAIL: str = os.getenv("LEAD_NOTIFICATION_EMAIL", "")
