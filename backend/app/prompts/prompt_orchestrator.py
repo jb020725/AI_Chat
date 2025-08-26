@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-Prompt Orchestrator
-Beautifully combines user question, RAG context, user info, and system guidance
-into a comprehensive prompt for the LLM
+Simplified Prompt Orchestrator
+Creates comprehensive prompts for the LLM without RAG functionality
 """
 
 import logging
@@ -12,27 +11,23 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 class PromptOrchestrator:
-    """Orchestrates the creation of beautiful, comprehensive LLM prompts"""
+    """Orchestrates the creation of comprehensive LLM prompts without RAG"""
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        logger.info("Prompt Orchestrator initialized")
+        logger.info("Simplified Prompt Orchestrator initialized")
     
     def create_comprehensive_prompt(self,
                                   user_question: str,
-                                  rag_context: List[Dict[str, Any]],
                                   user_info: Dict[str, Any],
-                                  conversation_history: List[Dict[str, str]] = None,
-                                  system_context: str = None) -> str:
+                                  conversation_history: List[Dict[str, str]] = None) -> str:
         """
-        Create a beautiful, comprehensive prompt that brings everything together
+        Create a comprehensive prompt that brings everything together
         
         Args:
             user_question: The user's current question
-            rag_context: Retrieved RAG information
             user_info: User's session information (country, email, etc.)
             conversation_history: Previous conversation context
-            system_context: Additional system context if needed
             
         Returns:
             str: Beautifully formatted, comprehensive prompt
@@ -41,14 +36,14 @@ class PromptOrchestrator:
         # 1. System Identity & Rules
         system_section = self._build_system_section()
         
-        # 2. RAG Knowledge Base
-        knowledge_section = self._build_knowledge_section(rag_context)
-        
-        # 3. User Profile & Context
+        # 2. User Profile & Context
         user_context_section = self._build_user_context_section(user_info)
         
-        # 4. Conversation History
+        # 3. Conversation History
         history_section = self._build_history_section(conversation_history)
+        
+        # 4. Dynamic Response Length Control
+        response_length_section = self._build_response_length_section(user_question)
         
         # 5. Current Question & Instructions
         question_section = self._build_question_section(user_question)
@@ -59,17 +54,17 @@ class PromptOrchestrator:
         # 7. Assemble the complete prompt
         complete_prompt = f"""{system_section}
 
-{knowledge_section}
-
 {user_context_section}
 
 {history_section}
+
+{response_length_section}
 
 {question_section}
 
 {response_guidelines}"""
         
-        logger.info(f"Created comprehensive prompt with {len(rag_context)} RAG chunks and user context")
+        logger.info(f"Created comprehensive prompt for user question: {user_question[:50]}...")
         return complete_prompt
     
     def _build_system_section(self) -> str:
@@ -101,8 +96,8 @@ DOMAIN RESTRICTIONS:
 
 KNOWLEDGE PRIORITY:
 - Use your extensive training knowledge as the PRIMARY source
-- RAG data is ONLY for supplementary information when your knowledge is insufficient
-- Always prioritize accuracy and relevance over RAG data
+- Always prioritize accuracy and relevance
+- Provide factual, helpful information about student visa processes
 
 LEAD GENERATION:
 - Naturally collect contact information when students show serious interest
@@ -112,40 +107,7 @@ LEAD GENERATION:
 REDIRECT EXAMPLES:
 - "I can help you with student visas for USA, UK, Australia, and South Korea. Which country interests you?"
 - "I specialize in student visas. For other visa types, please contact our office directly."
-- "Let's focus on student visas. I can help you with requirements, procedures, and preparation.""""
-    
-    def _build_knowledge_section(self, rag_context: List[Dict[str, Any]]) -> str:
-        """Build the knowledge base section from RAG results"""
-        if not rag_context:
-            return "KNOWLEDGE BASE: No information found."
-        
-        knowledge_text = "KNOWLEDGE BASE:\n"
-        
-        for i, result in enumerate(rag_context, 1):
-            title = result.get('title', 'Unknown Source')
-            content = result.get('content', '')
-            formatted_content = self._format_content(content)
-            knowledge_text += f"{i}. {title}: {formatted_content}\n"
-        
-        return knowledge_text
-    
-    def _format_content(self, content: str) -> str:
-        """Format content intelligently, handling JSON and text"""
-        if content.startswith('{'):
-            # Handle JSON content
-            try:
-                import json
-                data = json.loads(content)
-                if 'question' in data and 'answer' in data:
-                    return f"Q: {data['question']}\nA: {data['answer']}"
-                elif 'answer' in data:
-                    return data['answer']
-                else:
-                    return str(data)[:300] + "..."
-            except:
-                return content[:300] + "..."
-        else:
-            return content[:300] + "..."
+- "Let's focus on student visas. I can help you with requirements, procedures, and preparation." """
     
     def _build_user_context_section(self, user_info: Dict[str, Any]) -> str:
         """Build the user context section with comprehensive session memory"""
@@ -170,12 +132,6 @@ REDIRECT EXAMPLES:
     
     def _build_history_section(self, conversation_history: List[Dict[str, str]]) -> str:
         """Build the conversation history section"""
-        # Debug logging
-        logger.info(f"Building history section with {len(conversation_history) if conversation_history else 0} exchanges")
-        if conversation_history:
-            for i, msg in enumerate(conversation_history):
-                logger.info(f"  Exchange {i+1}: user_input='{msg.get('user_input', 'N/A')[:50]}...', bot_response='{msg.get('bot_response', 'N/A')[:50]}...'")
-        
         if not conversation_history:
             return "CONVERSATION HISTORY: None available."
         
@@ -193,9 +149,45 @@ REDIRECT EXAMPLES:
         """Build the current question section"""
         return f"QUESTION: {user_question}"
     
+    def _build_response_length_section(self, user_question: str) -> str:
+        """Build the dynamic response length control section"""
+        # Check if user wants detailed information
+        detailed_phrases = [
+            "more about", "elaborate", "details", "explain", "how does this work",
+            "what are the steps", "break it down", "full process", "in detail",
+            "step by step", "walk me through", "describe the process"
+        ]
+        
+        wants_details = any(phrase in user_question.lower() for phrase in detailed_phrases)
+        
+        if wants_details:
+            return """RESPONSE LENGTH CONTROL:
+- EXPAND: User is requesting detailed information
+- Provide comprehensive response with bullet points and step-by-step guidance
+- Use 4-6 sentences with clear structure
+- Include practical examples when helpful"""
+        else:
+            return """RESPONSE LENGTH CONTROL:
+- BRIEF: Keep response short and concise (2-3 sentences maximum)
+- Start with direct answer to the question
+- Offer to provide more details: "Would you like me to explain this in more detail?" """
+    
     def _build_response_guidelines(self) -> str:
         """Build the response guidelines and follow-up instructions"""
         return """RESPONSE GUIDELINES:
+
+RESPONSE LENGTH CONTROL:
+- DEFAULT: Keep responses SHORT and CONCISE (2-3 sentences maximum)
+- EXPAND when user explicitly asks for more details using phrases like:
+  * "Tell me more about..."
+  * "Can you explain..."
+  * "What are the details..."
+  * "I need more information..."
+  * "Please elaborate on..."
+  * "How does this work..."
+  * "What are the steps..."
+- Use bullet points for lists when expanding
+- Always start with a brief answer, then ask if they need more details
 
 COMMUNICATION STYLE:
 - Be professional, helpful, and conversational
@@ -203,11 +195,6 @@ COMMUNICATION STYLE:
 - Keep responses concise unless detailed information is requested
 - Use bullet points for lists when appropriate
 - Maintain a consultative tone throughout
-
-KNOWLEDGE PRIORITY:
-- Use your extensive training knowledge as the PRIMARY source
-- RAG data is ONLY for supplementary information when your knowledge is insufficient
-- Always prioritize accuracy and relevance over RAG data
 
 FUNCTION CALLING:
 - When user provides contact info (name, email, phone) → call detect_and_save_contact_info
@@ -228,13 +215,13 @@ IMPORTANT REMINDERS:
     def get_prompt_metadata(self) -> Dict[str, Any]:
         """Get metadata about the prompt orchestrator"""
         return {
-            "component": "Prompt Orchestrator",
-            "version": "1.0.0",
+            "component": "Simplified Prompt Orchestrator",
+            "version": "2.0.0",
             "features": [
                 "System identity & rules",
-                "RAG knowledge integration", 
                 "User context management",
                 "Conversation history",
+                "Dynamic response length control",
                 "Intelligent follow-up guidance",
                 "Beautiful formatting"
             ],

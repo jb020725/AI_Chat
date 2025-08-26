@@ -37,7 +37,7 @@ from app.utils.paths import CFG
 from app.utils.logging_config import setup_clean_logging
 from app.config import settings
 
-# RAG components are kept in folder but not imported or used
+# RAG components have been completely removed
 RAG_AVAILABLE = False
 RAG_ENABLED = False
 
@@ -184,7 +184,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Index Directory: {CFG.INDEX_DIR}")
     logger.info(f"Lead Capture: {'Available' if LEAD_CAPTURE_AVAILABLE else 'Not Available'}")
     logger.info(f"Memory System: {'Available' if MEMORY_AVAILABLE else 'Not Available'}")
-    logger.info(f"RAG System: Not Used (files kept but not imported)")
+    logger.info(f"RAG System: Completely removed from project")
     logger.info(f"Gemini AI: {'Available' if GEMINI_AVAILABLE else 'Not Available'}")
     logger.info(f"Simple Chatbot: Direct LLM responses with session memory")
     logger.info(f"Rate Limiting: 60/minute, 1000/hour per IP")
@@ -218,8 +218,8 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "rag_available": RAG_AVAILABLE,
-        "rag_status": "Not Used",
+        "rag_available": False,
+        "rag_status": "Completely Removed",
         "gemini_available": GEMINI_AVAILABLE,
         "memory_available": MEMORY_AVAILABLE,
         "lead_capture_available": LEAD_CAPTURE_AVAILABLE,
@@ -362,7 +362,7 @@ async def get_system_info():
         },
         "data_structure": {
             "available_countries": ["USA", "UK", "Australia", "South Korea"],
-            "rag_files": "Kept in folder but not used",
+            "rag_files": "Completely removed",
             "data_files": list(CFG.DATA_DIR.glob("**/*.jsonl")) if CFG.DATA_DIR.exists() else []
         },
         "chatbot_features": {
@@ -396,7 +396,7 @@ async def get_status():
         "timestamp": datetime.now().isoformat(),
         "version": "3.0.0",
         "components": {
-            "rag_system": "not_used",
+            "rag_system": "completely_removed",
             "memory_system": "operational" if MEMORY_AVAILABLE else "unavailable",
             "lead_capture": "operational" if LEAD_CAPTURE_AVAILABLE else "unavailable",
             "gemini_ai": "operational" if GEMINI_AVAILABLE else "unavailable",

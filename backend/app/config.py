@@ -26,7 +26,7 @@ class Settings:
 	REQUIRED_LEAD_FIELDS: list = ["name", "email", "phone", "target_country"]
 	OPTIONAL_LEAD_FIELDS: list = ["preferred_intake", "study_level", "gpa_grades", "study_field"]
 	
-	# RAG Settings
+	# RAG Settings (Removed - No longer used)
 	TOP_K_RETRIEVAL: int = int(os.getenv("TOP_K_RETRIEVAL", "3"))
 	LOW_SCORE_THRESHOLD: float = float(os.getenv("LOW_SCORE_THRESHOLD", "0.22"))
 

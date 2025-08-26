@@ -209,36 +209,32 @@ SESSION CONTEXT:
         if lead_saved:
             lead_status = "\nLEAD STATUS: Contact information has been saved and an advisor will contact you soon."
         
-        prompt = f"""You are a professional student visa consultant representing AI Consultancy, specializing in helping Nepali students apply to USA, UK, Australia, and South Korea.
-
-{session_context}
-
-{conversation_context}
-
-{lead_status}
-
-Current user message: "{user_message}"
-
-RESPONSE STRATEGY:
-1. If user asks general visa questions → Provide helpful, accurate information about student visas
-2. If user shows interest in applying ("I want to apply", "interested in UK", "thinking about Australia") → Politely ask for contact details explaining that physical application is required
-3. If user provides contact info → Acknowledge and confirm you'll have an advisor contact them
-4. Continue answering questions normally after lead capture
-
-VISA KNOWLEDGE:
-- USA: F-1 visa, SEVIS fee, Form DS-160, financial proof ($25,000+ annually)
-- UK: Tier 4 visa, CAS letter, financial evidence (£1,334/month London, £1,023/month outside)
-- Australia: Subclass 500, CoE, financial capacity, OSHC insurance
-- South Korea: D-2 visa, acceptance certificate, financial guarantee ($10,000+), TOPIK level 3+
-
-BEHAVIOR:
-- Be professional, helpful, and informative
-- Don't repeat information unnecessarily (use session context)
-- When asking for contact, explain that physical office visit is required for application
-- Stay concise and actionable
-- Always maintain a helpful, professional tone
-
-Remember: You are a visa consultant helping students. Be informative, professional, and guide them toward the next step when they show interest."""
+        # Import and use the new prompt orchestrator
+        from app.prompts import get_prompt_orchestrator
+        
+        prompt_orchestrator = get_prompt_orchestrator()
+        
+        # Get user info for prompt
+        user_info = {}
+        if session_info:
+            user_info = {
+                'country': getattr(session_info, 'study_country', ''),
+                'email': getattr(session_info, 'email', ''),
+                'name': getattr(session_info, 'name', ''),
+                'intake': getattr(session_info, 'intake', ''),
+                'phone': getattr(session_info, 'phone', '')
+            }
+        
+        # Create comprehensive prompt using the orchestrator
+        prompt = prompt_orchestrator.create_comprehensive_prompt(
+            user_question=user_message,
+            user_info=user_info,
+            conversation_history=conversation_history
+        )
+        
+        # Add lead status if available
+        if lead_saved:
+            prompt += "\n\nLEAD STATUS: Contact information has been saved and an advisor will contact you soon."
         
         return prompt
     

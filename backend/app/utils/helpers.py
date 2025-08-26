@@ -53,3 +53,54 @@ def sanitize_filename(filename: str) -> str:
     # Remove or replace unsafe characters
     safe_filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
     return safe_filename[:255]  # Limit length
+
+def detect_detailed_response_request(message: str) -> bool:
+    """
+    Detect if user is requesting detailed information
+    
+    Args:
+        message: User's message
+        
+    Returns:
+        bool: True if user wants detailed response, False for brief response
+    """
+    detailed_phrases = [
+        "tell me more",
+        "can you explain",
+        "what are the details",
+        "i need more information",
+        "please elaborate",
+        "how does this work",
+        "what are the steps",
+        "can you break this down",
+        "give me the full process",
+        "explain in detail",
+        "more details",
+        "detailed explanation",
+        "step by step",
+        "walk me through",
+        "describe the process",
+        "what's involved",
+        "how do i",
+        "what do i need to do",
+        "break it down",
+        "in detail"
+    ]
+    
+    message_lower = message.lower()
+    return any(phrase in message_lower for phrase in detailed_phrases)
+
+def get_response_length_instruction(message: str) -> str:
+    """
+    Get response length instruction based on user message
+    
+    Args:
+        message: User's message
+        
+    Returns:
+        str: Response length instruction for the prompt
+    """
+    if detect_detailed_response_request(message):
+        return "EXPAND: User is requesting detailed information. Provide comprehensive response with bullet points and step-by-step guidance."
+    else:
+        return "BRIEF: Keep response short and concise (2-3 sentences maximum). Offer to provide more details if needed."
