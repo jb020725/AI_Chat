@@ -294,8 +294,19 @@ class SmartResponse:
         words = name_lower.split()
         valid_words = [word for word in words if word not in invalid_words and len(word) > 1]
         
-        # Name is valid if it has at least one valid word
-        return len(valid_words) > 0
+        # Name is valid if it has at least one valid word AND is not too long
+        if len(valid_words) == 0:
+            return False
+        
+        # Additional validation: name should not be too long (max 50 characters)
+        if len(name) > 50:
+            return False
+        
+        # Additional validation: name should not contain numbers or special characters
+        if re.search(r'[0-9!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?]', name):
+            return False
+        
+        return True
     
     def _is_better_name(self, new_name: str, existing_name: str) -> bool:
         """Check if new name is better than existing name"""
@@ -350,12 +361,12 @@ class SmartResponse:
             
             # Extract name - ONLY when explicitly stated, not random words
             name_patterns = [
-                r'\bmy name is\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',  # "My name is John Smith"
-                r'\bi\'m\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',         # "I'm John Smith"
-                r'\bi am\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',         # "I am John Smith"
-                r'\bname\s*:\s*([A-Za-z\s]+?)(?:\s*[,.]|$)',     # "Name: John Smith"
-                r'\bcall me\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',      # "Call me John"
-                r'\bthis is\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',      # "This is John"
+                r'\bmy name is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s*[,.]|$)',  # "My name is John Smith"
+                r'\bi\'m\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s*[,.]|$)',         # "I'm John Smith"
+                r'\bi am\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s*[,.]|$)',         # "I am John Smith"
+                r'\bname\s*:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s*[,.]|$)',     # "Name: John Smith"
+                r'\bcall me\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s*[,.]|$)',      # "Call me John"
+                r'\bthis is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s*[,.]|$)',      # "This is John"
                 r'\b([A-Z][a-z]+)\s+([A-Z][a-z]+)',              # "John Smith" (First Last format)
             ]
             
