@@ -245,6 +245,64 @@ class LeadCaptureTool:
                 "fallback_data": update_data
             }
     
+    def get_lead_by_id(self, lead_id: str) -> Dict[str, Any]:
+        """
+        Retrieve a lead by ID.
+        
+        Args:
+            lead_id: Lead ID to search for
+            
+        Returns:
+            Dictionary with lead data or error
+        """
+        try:
+            if not lead_id:
+                return {
+                    "success": False,
+                    "error": "Lead ID must be provided"
+                }
+            
+            if self.supabase:
+                # Query Supabase by ID
+                result = self.supabase.table(self.table_name).select("*").eq("id", lead_id).execute()
+                
+                if result.data:
+                    lead_data = result.data[0]
+                    logger.info(f"Lead retrieved by ID: {lead_id}")
+                    return {
+                        "success": True,
+                        "data": lead_data,
+                        "message": "Lead retrieved successfully"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Lead not found with ID: {lead_id}"
+                    }
+            else:
+                # Mock mode
+                mock_lead = {
+                    "id": lead_id,
+                    "email": "mock@example.com",
+                    "name": "Mock User",
+                    "status": "new",
+                    "lead_score": 50,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+                logger.info(f"Mock mode: Retrieved lead by ID: {lead_id}")
+                return {
+                    "success": True,
+                    "data": mock_lead,
+                    "message": "Lead retrieved successfully (mock mode)"
+                }
+                
+        except Exception as e:
+            logger.error(f"Error retrieving lead {lead_id}: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
     def get_lead(self, lead_id: Optional[str] = None, email: Optional[str] = None) -> Dict[str, Any]:
         """
         Retrieve a lead by ID or email.
