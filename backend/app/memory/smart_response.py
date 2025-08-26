@@ -305,7 +305,8 @@ class SmartResponse:
         return False
     
     def _extract_contact_info(self, message: str) -> Dict[str, str]:
-        """Extract contact information from user message - Enhanced extraction with country/level detection - FORCE DEPLOYMENT"""
+        """Extract contact information from user message - Enhanced extraction with country/level detection - FIXED PATTERNS AND DEBUG LOGGING - FORCE DEPLOYMENT"""
+        logger.info(f"🚀 EXTRACTION FUNCTION CALLED with message: '{message[:100]}...'")
         contact_info = {}
         message_lower = message.lower()
         
@@ -370,58 +371,71 @@ class SmartResponse:
             'south_korea': ['south korea', 'korea', 'korean', 'seoul', 'republic of korea']
         }
         
+        logger.info(f"🔍 DEBUG: Checking country patterns in message: '{message_lower}'")
         for country, patterns in country_patterns.items():
             for pattern in patterns:
                 if pattern in message_lower:
                     contact_info['country'] = country
-                    logger.info(f"Extracted country: {contact_info['country']}")
+                    logger.info(f"✅ MATCHED country '{country}' with pattern '{pattern}'")
                     break
             if 'country' in contact_info:
                 break
         
         # Extract study level - More flexible patterns
         study_level_patterns = {
-            'bachelor': ['bachelor', 'bachelors', 'undergraduate', 'bachelor\'s', 'bachelors degree', 'bachelor degree'],
-            'master': ['master', 'masters', 'graduate', 'master\'s', 'masters degree', 'master degree', 'ms', 'ma'],
-            'phd': ['phd', 'doctorate', 'doctoral', 'doctor of philosophy', 'ph.d'],
+            'bachelor': ['bachelor', 'bachelors', 'undergraduate', 'bachelor\'s', 'bachelors degree', 'bachelor degree', 'bachelor\'s degree'],
+            'master': ['master', 'masters', 'graduate', 'master\'s', 'masters degree', 'master degree', 'ms', 'ma', 'mba'],
+            'phd': ['phd', 'doctorate', 'doctoral', 'doctor of philosophy', 'ph.d', 'ph.d.'],
             'diploma': ['diploma', 'certificate', 'certification']
         }
         
+        logger.info(f"🔍 DEBUG: Checking study level patterns in message: '{message_lower}'")
         for level, patterns in study_level_patterns.items():
             for pattern in patterns:
                 if pattern in message_lower:
                     contact_info['study_level'] = level
-                    logger.info(f"Extracted study level: {contact_info['study_level']}")
+                    logger.info(f"✅ MATCHED study level '{level}' with pattern '{pattern}'")
                     break
             if 'study_level' in contact_info:
                 break
         
-        # Extract program/field of study
-        program_patterns = [
-            r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+(?:computer science|cs|it|information technology)\b',
-            r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+(?:engineering|mechanical|electrical|civil|chemical)\b',
-            r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+(?:business|management|mba|finance|accounting|marketing)\b',
-            r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+(?:medicine|medical|health|nursing|pharmacy)\b',
-            r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+(?:arts|humanities|english|history|philosophy)\b',
-            r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+(?:science|physics|chemistry|biology|mathematics|math)\b',
-            r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+(\w+(?:\s+\w+)*)\b'
+        # Extract program/field of study - SIMPLIFIED and more flexible
+        program_keywords = [
+            'computer science', 'cs', 'it', 'information technology', 'software engineering',
+            'engineering', 'mechanical', 'electrical', 'civil', 'chemical', 'biomedical',
+            'business', 'management', 'mba', 'finance', 'accounting', 'marketing', 'economics',
+            'medicine', 'medical', 'health', 'nursing', 'pharmacy', 'public health',
+            'arts', 'humanities', 'english', 'history', 'philosophy', 'psychology',
+            'science', 'physics', 'chemistry', 'biology', 'mathematics', 'math', 'statistics',
+            'architecture', 'design', 'fashion', 'music', 'film', 'journalism'
         ]
         
-        for pattern in program_patterns:
-            program_match = re.search(pattern, message_lower, re.IGNORECASE)
-            if program_match:
-                if len(program_match.groups()) > 0:
+        logger.info(f"🔍 DEBUG: Checking program keywords in message: '{message_lower}'")
+        for keyword in program_keywords:
+            if keyword in message_lower:
+                contact_info['program'] = keyword.title()
+                logger.info(f"✅ MATCHED program '{keyword}'")
+                break
+        
+        # If no program found with keywords, try to extract from context
+        if 'program' not in contact_info:
+            logger.info(f"🔍 DEBUG: No direct keyword match, trying context patterns...")
+            # Look for "study X" or "interested in X" patterns
+            study_patterns = [
+                r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+([a-zA-Z\s]+?)(?:\s+in|\s+for|\s*$|\.|,)',
+                r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+([a-zA-Z\s]+?)(?:\s+degree|\s+program|\s+course)',
+            ]
+            
+            for pattern in study_patterns:
+                program_match = re.search(pattern, message_lower, re.IGNORECASE)
+                if program_match:
                     program = program_match.group(1).strip()
-                else:
-                    # Extract from the full match
-                    full_match = program_match.group(0)
-                    # Remove common words and extract the actual program
-                    program = re.sub(r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\b', '', full_match).strip()
-                
-                if program and len(program) > 2:
-                    contact_info['program'] = program.title()
-                    logger.info(f"Extracted program: {contact_info['program']}")
-                    break
+                    # Clean up the program name
+                    program = re.sub(r'\b(?:degree|program|course|in|for)\b', '', program).strip()
+                    if program and len(program) > 2 and program not in ['a', 'an', 'the', 'my', 'your']:
+                        contact_info['program'] = program.title()
+                        logger.info(f"✅ MATCHED program from context: '{program}' with pattern '{pattern}'")
+                        break
         
         # Extract intake period
         intake_patterns = {
@@ -431,11 +445,12 @@ class SmartResponse:
             'winter': ['winter', 'december', 'january', 'february']
         }
         
+        logger.info(f"🔍 DEBUG: Checking intake patterns in message: '{message_lower}'")
         for intake, patterns in intake_patterns.items():
             for pattern in patterns:
                 if pattern in message_lower:
                     contact_info['intake'] = intake.title()
-                    logger.info(f"Extracted intake: {contact_info['intake']}")
+                    logger.info(f"✅ MATCHED intake '{intake}' with pattern '{pattern}'")
                     break
             if 'intake' in contact_info:
                 break
