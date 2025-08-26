@@ -1,11 +1,25 @@
 // src/lib/config.ts
-// Configuration using build-time constants - no .env files needed!
+// PERMANENT Configuration - URLs never change!
 
 export const config = {
   // API Configuration
   apiBase: (__API_BASE__ as string) || '',
-  isProduction: (__IS_PRODUCTION__ as boolean) || true, // Set to true for production deployment
-  appVersion: (__APP_VERSION__ as string) || '2.0.0',
+  isProduction: (__IS_PRODUCTION__ as boolean) || true,
+  appVersion: (__APP_VERSION__ as string) || '3.0.0',
+  
+  // PERMANENT URLs - These never change!
+  permanentUrls: {
+    // Production URLs - Set once, never change
+    production: {
+      backend: 'https://ai-chatbot-backend-971031410928.us-central1.run.app',
+      frontend: 'https://ai-chatbot-frontend-971031410928.us-central1.run.app'
+    },
+    // Development URLs
+    development: {
+      backend: 'http://127.0.0.1:8000',
+      frontend: 'http://localhost:5173'
+    }
+  },
   
   // Feature Flags
   features: {
@@ -53,15 +67,25 @@ export const config = {
   },
 };
 
-// Helper function to get stable backend URL
+// PERMANENT Helper function - URL never changes!
 export function getBackendUrl(): string {
   if (config.isProduction) {
-    // Production: use stable custom service names
-    // These URLs will never change unless you manually change the service names
-    return 'https://ai-chatbot-backend-971031410928.us-central1.run.app';
+    // PERMANENT Production URL - Set once, never changes
+    return config.permanentUrls.production.backend;
   } else {
-    // Development: use local backend
-    return 'http://127.0.0.1:8000';
+    // Development URL
+    return config.permanentUrls.development.backend;
+  }
+}
+
+// PERMANENT Helper function - URL never changes!
+export function getFrontendUrl(): string {
+  if (config.isProduction) {
+    // PERMANENT Production URL - Set once, never changes
+    return config.permanentUrls.production.frontend;
+  } else {
+    // Development URL
+    return config.permanentUrls.development.frontend;
   }
 }
 
@@ -83,6 +107,7 @@ export function getEnvironmentInfo() {
     version: config.appVersion,
     apiBase: config.apiBase,
     backendUrl: getBackendUrl(),
+    frontendUrl: getFrontendUrl(),
     timestamp: new Date().toISOString(),
   };
 }

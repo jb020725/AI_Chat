@@ -17,22 +17,22 @@ A production-ready AI chatbot with function calling and lead capture, built with
 
 ### **Frontend (Chatbot Interface):**
 ```
-https://visa-chatbot-frontend-971031410928.us-central1.run.app
+https://ai-chatbot-frontend-971031410928.us-central1.run.app
 ```
 
 ### **Backend (API Service):**
 ```
-https://visa-chatbot-backend-971031410928.us-central1.run.app
+https://ai-chatbot-backend-971031410928.us-central1.run.app
 ```
 
 ### **Quick Access Commands:**
 ```bash
 # Get current URLs (run from project root)
-gcloud run services list --platform managed --region us-central1 --filter="metadata.name~visa-chatbot"
+gcloud run services list --platform managed --region us-central1 --filter="metadata.name~ai-chatbot"
 
 # Check deployment status
-gcloud run services describe visa-chatbot-frontend --region us-central1
-gcloud run services describe visa-chatbot-backend --region us-central1
+gcloud run services describe ai-chatbot-frontend --region us-central1
+gcloud run services describe ai-chatbot-backend --region us-central1
 ```
 
 ### **Deployment Status:**
