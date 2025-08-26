@@ -12,7 +12,7 @@ import json
 from datetime import datetime
 
 # Import your existing systems
-from app.memory.smart_response import smart_response
+from app.memory.smart_response import get_smart_response
 from app.memory import get_session_memory
 from app.memory.telegram_user_manager import telegram_user_manager
 
@@ -99,7 +99,7 @@ async def telegram_webhook(request: Request):
             conversation_history.append(context_message)
         
         # Process message through your existing smart response system
-        result = smart_response.generate_smart_response(
+        result = get_smart_response().generate_smart_response(
             user_message=text,
             session_id=session_id,
             conversation_history=conversation_history

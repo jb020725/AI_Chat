@@ -310,6 +310,7 @@ class SmartResponse:
     
     def _extract_contact_info(self, message: str) -> Dict[str, str]:
         """Extract contact information from user message - Enhanced extraction with country/level detection - FIXED PATTERNS AND DEBUG LOGGING - FORCE DEPLOYMENT"""
+        print(f"🚀🚀🚀 EXTRACTION FUNCTION CALLED with message: '{message[:100]}...' 🚀🚀🚀")
         logger.info(f"🚀 EXTRACTION FUNCTION CALLED with message: '{message[:100]}...'")
         contact_info = {}
         message_lower = message.lower()
@@ -394,10 +395,12 @@ class SmartResponse:
         }
         
         logger.info(f"🔍 DEBUG: Checking study level patterns in message: '{message_lower}'")
+        print(f"🔍🔍🔍 CHECKING STUDY LEVEL PATTERNS: '{message_lower}' 🔍🔍🔍")
         for level, patterns in study_level_patterns.items():
             for pattern in patterns:
                 if pattern in message_lower:
                     contact_info['study_level'] = level
+                    print(f"✅✅✅ MATCHED STUDY LEVEL '{level}' with pattern '{pattern}' ✅✅✅")
                     logger.info(f"✅ MATCHED study level '{level}' with pattern '{pattern}'")
                     break
             if 'study_level' in contact_info:
@@ -415,9 +418,11 @@ class SmartResponse:
         ]
         
         logger.info(f"🔍 DEBUG: Checking program keywords in message: '{message_lower}'")
+        print(f"🔍🔍🔍 CHECKING PROGRAM KEYWORDS: '{message_lower}' 🔍🔍🔍")
         for keyword in program_keywords:
             if keyword in message_lower:
                 contact_info['program'] = keyword.title()
+                print(f"✅✅✅ MATCHED PROGRAM '{keyword}' ✅✅✅")
                 logger.info(f"✅ MATCHED program '{keyword}'")
                 break
         
@@ -591,5 +596,29 @@ Lead ID: {lead.get('id', 'N/A')}
             logger.error(f"Error getting session info: {e}")
             return None
 
-# Global instance
-smart_response = SmartResponse()
+# Global instance - will be properly initialized after config is loaded
+smart_response = None
+
+def get_smart_response():
+    """Get the properly configured smart_response instance"""
+    global smart_response
+    if smart_response is None:
+        # Initialize with proper configuration
+        from app.config import settings
+        config = {
+            "supabase_url": settings.SUPABASE_URL,
+            "supabase_service_role_key": settings.SUPABASE_SERVICE_ROLE_KEY,
+            "smtp_server": settings.SMTP_SERVER,
+            "smtp_port": settings.SMTP_PORT,
+            "smtp_username": settings.SMTP_USERNAME,
+            "smtp_password": settings.SMTP_PASSWORD,
+            "from_email": settings.FROM_EMAIL,
+            "from_name": settings.FROM_NAME,
+            "lead_notification_email": settings.LEAD_NOTIFICATION_EMAIL,
+            "enable_email_notifications": settings.ENABLE_EMAIL_NOTIFICATIONS
+        }
+        smart_response = SmartResponse()
+        # Initialize the lead capture tool with proper config
+        smart_response.lead_capture_tool = LeadCaptureTool(config)
+        logger.info("SmartResponse instance properly initialized with configuration")
+    return smart_response

@@ -52,7 +52,7 @@ RAG_ENABLED = False
 
 # Import Memory Management components
 try:
-    from app.memory import get_session_memory, smart_response
+    from app.memory import get_session_memory, get_smart_response
     from app.memory.api import router as memory_router
     MEMORY_AVAILABLE = True
 except ImportError as e:
@@ -260,7 +260,7 @@ async def chat(request: Request, chat_request: ChatRequest):
         if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
             try:
                 # Set the LLM model in the smart response system
-                smart_response.set_llm_model(model)
+                get_smart_response().set_llm_model(model)
                 logger.info("LLM model set in smart response system for simple chatbot")
                 
                 # Get conversation history
@@ -271,12 +271,14 @@ async def chat(request: Request, chat_request: ChatRequest):
                 
                 # Use concurrency control for LLM calls
                 async with llm_semaphore:
-                    logger.info(f"🔍 DEBUG: About to call smart_response.generate_smart_response")
+                    logger.info(f"🔍 DEBUG: About to call get_smart_response().generate_smart_response")
                     logger.info(f"🔍 DEBUG: Message: '{chat_request.message[:100]}...'")
                     logger.info(f"🔍 DEBUG: Session ID: {session_id}")
                     logger.info(f"🔍 DEBUG: Conversation history length: {len(conversation_history)}")
                     
-                    result = smart_response.generate_smart_response(
+                    smart_response_instance = get_smart_response()
+                    smart_response_instance.set_llm_model(model)
+                    result = smart_response_instance.generate_smart_response(
                         chat_request.message, session_id, conversation_history
                     )
                     
@@ -473,15 +475,16 @@ if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
     try:
         # Initialize the smart response system for simple chatbot
         logger.info("About to set LLM model in smart response system...")
-        smart_response.set_llm_model(model)
+        get_smart_response().set_llm_model(model)
         logger.info("Memory system initialized with LLM model for simple chatbot")
         
         # Verify the integration
-        if smart_response.llm_model:
+        smart_response_instance = get_smart_response()
+        if smart_response_instance.llm_model:
             logger.info("Simple chatbot successfully connected to smart response system")
         else:
             logger.error("Simple chatbot failed to connect to smart response system")
-            logger.error(f"LLM model status: {smart_response.llm_model}")
+            logger.error(f"LLM model status: {smart_response_instance.llm_model}")
             
     except Exception as e:
         logger.error(f"Failed to initialize memory system with LLM: {e}")

@@ -1,0 +1,12 @@
+Debug Results - 2025-08-27 00:17:57.887883
+==================================================
+environment: FAIL
+config: PASS
+smart_response: PASS
+lead_capture: PASS
+email: FAIL
+telegram: FAIL
+extraction: PASS
+endpoints: PASS
+
+Overall: 5/8 tests passed
