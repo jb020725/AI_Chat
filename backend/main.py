@@ -2,10 +2,9 @@
 """
 AI Chatbot Backend - Main Application
 - Receives user messages
-- Retrieves relevant information from RAG
-- Sends to LLM for response
-- Saves user information to Supabase
-- Returns response to user
+- Uses clean function calling for intelligent responses
+- Manages session memory and lead capture
+- Returns vetted, helpful responses
 """
 
 from fastapi import FastAPI, HTTPException, Request
@@ -44,7 +43,7 @@ RAG_ENABLED = False
 
 # Import Memory Management components
 try:
-    from app.memory import get_session_memory, get_smart_response_generator
+    from app.memory import get_session_memory, smart_response
     from app.memory.api import router as memory_router
     MEMORY_AVAILABLE = True
 except ImportError as e:
@@ -85,13 +84,9 @@ logger.info("Rate limiting initialized")
 if GEMINI_AVAILABLE:
     genai.configure(api_key=settings.GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-2.5-flash')
-    
-    # RAG-LLM integration is not used (files kept but not imported)
-    rag_llm_integrator = None
-    logger.info("RAG-LLM integration not used - using function calling only")
+    logger.info("Gemini 2.5 Flash initialized for clean function calling")
 else:
     model = None
-    rag_llm_integrator = None
 
 # Initialize Lead Capture Tool
 lead_capture_tool = None
@@ -107,10 +102,19 @@ if LEAD_CAPTURE_AVAILABLE:
 llm_semaphore = asyncio.Semaphore(20)  # Max 20 concurrent LLM calls (doubled for 2.5)
 logger.info("Concurrency control initialized - max 20 concurrent LLM calls (Gemini 2.5 Flash)")
 
+# Pydantic models for API
+class ChatRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = None
 
+class ChatResponse(BaseModel):
+    response: str
+    session_id: str
+    user_info_extracted: Optional[Dict[str, str]] = None
+    timestamp: str
 
 def extract_user_info(message: str) -> Dict[str, str]:
-    """Extract user information from message"""
+    """Extract user information from message (legacy support)"""
     user_info = {}
     message_lower = message.lower()
     
@@ -127,7 +131,6 @@ def extract_user_info(message: str) -> Dict[str, str]:
         user_info['phone'] = phone_match.group()
     
     # Extract name (improved pattern)
-    # Look for "my name is ..." or "I'm ..." or "I am ..." patterns
     name_patterns = [
         r'\bmy name is\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',
         r'\bi\'m\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',
@@ -140,7 +143,6 @@ def extract_user_info(message: str) -> Dict[str, str]:
         name_match = re.search(pattern, message_lower, re.IGNORECASE)
         if name_match:
             name = name_match.group(1).strip()
-            # Clean up common words that might get captured
             if name and len(name) > 1 and name not in ['user', 'test', 'example', 'sample']:
                 user_info['name'] = name.title()
                 break
@@ -153,11 +155,10 @@ def extract_user_info(message: str) -> Dict[str, str]:
         'south_korea': ['south korea', 'korea', 'korean', 'seoul']
     }
     
-    # Look for country mentions in the message
     for country, patterns in country_patterns.items():
         for pattern in patterns:
             if pattern in message_lower:
-                user_info['country'] = country  # Keep as lowercase code (usa, uk, australia, south_korea)
+                user_info['country'] = country
                 logger.info(f"Extracted country '{country}' from message")
                 break
         if 'country' in user_info:
@@ -172,16 +173,12 @@ def extract_user_info(message: str) -> Dict[str, str]:
     
     return user_info
 
-# RAG context function removed - not used in function calling approach
-
-# Legacy functions removed - now handled by function calling integration
-
 # Lifespan context manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize and cleanup on startup/shutdown"""
     # Startup
-    logger.info("AI Chatbot started with RATE LIMITING and CONCURRENCY CONTROLS!")
+    logger.info("AI Chatbot started with CLEAN FUNCTION CALLING STRUCTURE!")
     logger.info(f"Application Directory: {CFG.APP_DIR}")
     logger.info(f"Data Directory: {CFG.DATA_DIR}")
     logger.info(f"Index Directory: {CFG.INDEX_DIR}")
@@ -189,86 +186,31 @@ async def lifespan(app: FastAPI):
     logger.info(f"Memory System: {'Available' if MEMORY_AVAILABLE else 'Not Available'}")
     logger.info(f"RAG System: Not Used (files kept but not imported)")
     logger.info(f"Gemini AI: {'Available' if GEMINI_AVAILABLE else 'Not Available'}")
-    logger.info(f"Rate Limiting: 120/minute, 2000/hour per IP (Gemini 2.5 Flash)")
-    logger.info(f"Concurrency Control: Max 20 concurrent LLM calls (Gemini 2.5 Flash)")
+    logger.info(f"Clean Functions: get_answer, qualify_interest, request_consent, save_lead, schedule_callback, notify_human")
+    logger.info(f"Rate Limiting: 60/minute, 1000/hour per IP")
+    logger.info(f"Concurrency Control: Max 20 concurrent LLM calls")
     yield
     # Shutdown (if needed)
     logger.info("AI Chatbot shutting down...")
 
 # FastAPI app
-app = FastAPI(title="AI Consultancy AI Assistant - Production Ready with Rate Limiting", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="AI Consultancy AI Assistant - Clean Function Calling", version="3.0.0", lifespan=lifespan)
 
-# Add rate limiting to app state
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-# Include memory management routes
-if MEMORY_AVAILABLE:
-    app.include_router(memory_router)
-    logger.info("Memory management routes included")
-else:
-    logger.warning("Memory management routes not available")
-
-# CORS middleware
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Configure appropriately for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Pydantic models
-class ChatRequest(BaseModel):
-    message: str
-    session_id: Optional[str] = None
-    user_id: Optional[str] = None
+# Add rate limiting exception handler
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-class ChatResponse(BaseModel):
-    response: str
-    session_id: str
-    user_info_extracted: Dict[str, str] = {}
-    timestamp: str
-
-# API endpoints
-@app.get("/")
-async def root():
-    """Root endpoint with API information"""
-    return {
-        "message": "AI Consultancy AI Assistant API - Production Ready with Rate Limiting",
-        "version": "2.0.0",
-        "status": "running",
-        "features": {
-            "rate_limiting": "120/minute, 2000/hour per IP (Gemini 2.5 Flash)",
-            "concurrency_control": "Max 20 concurrent LLM calls (Gemini 2.5 Flash)",
-            "security": "Protected against abuse"
-        },
-        "description": "AI assistant specializing in student visas from Nepal to USA, UK, Australia, and South Korea",
-        "endpoints": {
-            "chat": "/api/chat",
-            "health": "/health",
-            "conversations": "/api/conversations/{id}",
-            "memory": "/memory/sessions" if MEMORY_AVAILABLE else None,
-            "system_info": "/api/system/info"
-        }
-    }
-
-@app.get("/api/info")
-async def api_info():
-    """API information endpoint for testing"""
-    return {
-        "status": "active",
-        "version": "1.0.0",
-        "data_structure": {
-            "available_countries": ["usa", "uk", "australia", "south_korea"],
-            "supported_features": ["rag", "function_calling", "session_memory", "lead_capture"]
-        },
-        "endpoints": {
-            "chat": "/api/chat",
-            "health": "/health",
-            "info": "/api/info"
-        }
-    }
+# Add memory router
+if MEMORY_AVAILABLE:
+    app.include_router(memory_router, prefix="/memory", tags=["memory"])
 
 @app.get("/health")
 async def health_check():
@@ -276,85 +218,88 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "rag_available": False,
-        "rag_status": "Not Used (files kept but not imported)",
+        "rag_available": RAG_AVAILABLE,
+        "rag_status": "Not Used",
         "gemini_available": GEMINI_AVAILABLE,
         "memory_available": MEMORY_AVAILABLE,
         "lead_capture_available": LEAD_CAPTURE_AVAILABLE,
-        "rate_limiting": "Active - 120/minute, 2000/hour per IP (Gemini 2.5 Flash)",
-        "concurrency_control": "Active - Max 20 concurrent LLM calls (Gemini 2.5 Flash)",
-        "supabase_connection": lead_capture_tool.health_check() if lead_capture_tool else "Not Available",
-        "paths": {
-            "app_dir": str(CFG.BACKEND_ROOT),
-            "data_dir": str(CFG.DATA_DIR),
-            "index_dir": str(CFG.INDEX_DIR)
-        }
+        "rate_limiting": "Active - 60/minute, 1000/hour per IP",
+        "concurrency_control": "Active - Max 20 concurrent LLM calls",
+        "function_calling_enabled": True,
+        "clean_functions": ["get_answer", "qualify_interest", "request_consent", "save_lead", "schedule_callback", "notify_human"]
     }
 
 @app.get("/healthz")
 async def healthz():
     """Lightweight health check for Cloud Run"""
-    # Simple health check - no RAG dependency
     return {"ready": True}, 200
 
 @app.post("/api/chat", response_model=ChatResponse)
 @limiter.limit("60/minute")  # 60 requests per minute per IP
 @limiter.limit("1000/hour")  # 1000 requests per hour per IP
 async def chat(request: Request, chat_request: ChatRequest):
-    """Main chat endpoint"""
+    """Main chat endpoint using clean function calling"""
     try:
         # Use provided session ID or generate new one
         session_id = chat_request.session_id or f"session_{datetime.now().timestamp()}"
         
-        # Extract user information for THIS TURN
+        # Extract user information for THIS TURN (legacy support)
         turn_info = extract_user_info(chat_request.message)
-        turn_country = turn_info.get("country")
         
         # Update session memory with extracted info
         if MEMORY_AVAILABLE and turn_info:
             memory = get_session_memory()
-            # ALWAYS update with new turn info - force override
             if turn_info:
                 memory.update_session(session_id, turn_info)
-                logger.info(f"FORCED session update with turn info: {turn_info}")
-                # Verify the update worked
-                updated_session = memory.get_user_info(session_id)
-                logger.info(f"Session after update: country={updated_session.country}, email={updated_session.email}")
+                logger.info(f"Session updated with turn info: {turn_info}")
         
-        # Generate smart response with memory integration and function calling (NO RAG)
-        if MEMORY_AVAILABLE:
-            smart_generator = get_smart_response_generator()
-            
-            # Set the LLM model in the smart generator for function calling
-            if GEMINI_AVAILABLE and model:
-                smart_generator.set_llm_model(model)
-                logger.info("LLM model set in smart response generator for function calling")
-            
-            # Get conversation history for the smart generator
-            memory = get_session_memory()
-            # Get REAL conversation history from session memory
-            conversation_context = memory.get_conversation_context(session_id)
-            conversation_history = conversation_context.get("conversation_history", [])
-            logger.info(f"Retrieved conversation history: {len(conversation_history)} exchanges")
-            
-            # Use concurrency control for LLM calls
-            async with llm_semaphore:
-                ai_response = smart_generator.generate_response(
-                    chat_request.message, "", session_id, conversation_history
-                )
-            
-            # Track the conversation exchange in session memory
+        # Generate smart response using clean function calling
+        if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
             try:
-                memory.add_conversation_exchange(session_id, chat_request.message, ai_response)
-                logger.info(f"Conversation exchange tracked for session {session_id}")
+                # Set the LLM model in the smart response system
+                smart_response.set_llm_model(model)
+                logger.info("LLM model set in smart response system for clean function calling")
                 
+                # Get conversation history
+                memory = get_session_memory()
+                conversation_context = memory.get_conversation_context(session_id)
+                conversation_history = conversation_context.get("conversation_history", [])
+                logger.info(f"Retrieved conversation history: {len(conversation_history)} exchanges")
+                
+                # Use concurrency control for LLM calls
+                async with llm_semaphore:
+                    result = smart_response.generate_smart_response(
+                        chat_request.message, session_id, conversation_history
+                    )
+                
+                # Extract response from result
+                if result.get('success'):
+                    ai_response = result.get('response', '')
+                    function_calls = result.get('function_calls', [])
+                    
+                    # Log function calls for debugging
+                    if function_calls:
+                        logger.info(f"Function calls executed: {[fc.get('function_name') for fc in function_calls]}")
+                    
+                else:
+                    # Fallback response if function calling fails
+                    ai_response = "I'm experiencing technical difficulties. Please try again or ask a different question."
+                    logger.warning(f"Function calling failed: {result.get('error')}")
+                
+                # Track the conversation exchange in session memory
+                try:
+                    memory.add_conversation_exchange(session_id, chat_request.message, ai_response)
+                    logger.info(f"Conversation exchange tracked for session {session_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to track conversation exchange: {e}")
+                    
             except Exception as e:
-                logger.warning(f"Failed to track conversation exchange: {e}")
+                logger.error(f"Error in smart response generation: {e}")
+                ai_response = "I'm having technical difficulties. Please try again."
+                
         else:
-            # Fallback to basic response (NO RAG)
+            # Fallback to basic response
             ai_response = "I can help you with student visa information for USA, UK, Australia, and South Korea. Please share your contact details and preferred country for personalized guidance."
-        
-        # Lead saving is now handled by function calling integration
         
         return ChatResponse(
             response=ai_response,
@@ -402,8 +347,8 @@ async def get_system_info():
     """Get system information and paths"""
     return {
         "application_info": {
-            "name": "AI Chatbot - Production Ready",
-            "version": "2.0.0",
+            "name": "AI Chatbot - Clean Function Calling",
+            "version": "3.0.0",
             "environment": "production",
             "security_features": {
                 "rate_limiting": "Active",
@@ -424,9 +369,17 @@ async def get_system_info():
             "rag_files": "Kept in folder but not used",
             "data_files": list(CFG.DATA_DIR.glob("**/*.jsonl")) if CFG.DATA_DIR.exists() else []
         },
+        "clean_functions": {
+            "get_answer": "Vetted content lookup",
+            "qualify_interest": "Interest capture without PII",
+            "request_consent": "Explicit consent management",
+            "save_lead": "Contact storage after consent",
+            "schedule_callback": "Human advisor booking",
+            "notify_human": "CRM handoff"
+        },
         "rate_limiting": {
-            "requests_per_minute": 120,
-            "requests_per_hour": 2000,
+            "requests_per_minute": 60,
+            "requests_per_hour": 1000,
             "concurrent_llm_calls": 20
         }
     }
@@ -445,48 +398,44 @@ async def get_status():
     return {
         "status": "operational",
         "timestamp": datetime.now().isoformat(),
-        "version": "2.0.0",
+        "version": "3.0.0",
         "components": {
             "rag_system": "not_used",
             "memory_system": "operational" if MEMORY_AVAILABLE else "unavailable",
             "lead_capture": "operational" if LEAD_CAPTURE_AVAILABLE else "unavailable",
             "gemini_ai": "operational" if GEMINI_AVAILABLE else "unavailable",
             "rate_limiting": "operational",
-            "concurrency_control": "operational"
+            "concurrency_control": "operational",
+            "clean_function_calling": "operational" if MEMORY_AVAILABLE and GEMINI_AVAILABLE else "unavailable"
         },
         "uptime": 0  # You can add actual uptime calculation if needed
     }
 
-
-
-
-
-# Initialize Memory System with LLM model (Function Calling Only)
+# Initialize Memory System with LLM model (Clean Function Calling)
 if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
     try:
-        # Initialize the smart response generator with function calling only
-        smart_generator = get_smart_response_generator()
-        smart_generator.set_llm_model(model)
-        logger.info("Memory system initialized with LLM model for function calling")
+        # Initialize the smart response system with clean function calling
+        smart_response.set_llm_model(model)
+        logger.info("Memory system initialized with LLM model for clean function calling")
         
         # Verify the integration
-        if smart_generator.function_integrator:
-            logger.info("Function calling successfully connected to smart response generator")
+        if smart_response.function_integrator:
+            logger.info("Clean function calling successfully connected to smart response system")
         else:
-            logger.error("Function calling failed to connect to smart response generator")
+            logger.error("Clean function calling failed to connect to smart response system")
             
     except Exception as e:
         logger.error(f"Failed to initialize memory system with LLM: {e}")
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
 else:
-    logger.warning("Memory system or LLM not available for integration")
+    logger.warning("Memory system or LLM not available for clean function calling integration")
 
 if __name__ == "__main__":
     # Run the FastAPI app
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",  # Use localhost instead of 0.0.0.0
+        host="0.0.0.0",
         port=int(os.getenv("PORT", 8000)),
         reload=False,  # Disable reload to stop file watching spam
         log_level="info"

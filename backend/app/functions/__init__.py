@@ -1,7 +1,7 @@
 """
 Function Calling Module for AI Chatbot
 
-This module handles clean, focused function calling for:
+eThis module handles clean, focused function calling for:
 - Vetted content lookup (get_answer)
 - Interest qualification (qualify_interest)
 - Consent management (request_consent)

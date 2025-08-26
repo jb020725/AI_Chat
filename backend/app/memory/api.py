@@ -7,7 +7,7 @@ Provides endpoints for monitoring and managing session memory
 from fastapi import APIRouter, HTTPException
 from typing import Dict, Any
 from .session_memory import get_session_memory
-from .smart_response import get_smart_response_generator
+from .smart_response import smart_response
 
 router = APIRouter(prefix="/memory", tags=["memory"])
 
@@ -54,11 +54,17 @@ async def clear_session(session_id: str):
 async def get_response_metadata(session_id: str):
     """Get metadata about response generation for a session"""
     try:
-        generator = get_smart_response_generator()
-        metadata = generator.get_response_metadata(session_id)
+        session_info = smart_response.get_session_info(session_id)
         return {
             "status": "success",
-            "metadata": metadata
+            "metadata": {
+                "session_id": session_id,
+                "has_contact_info": bool(session_info.email or session_info.phone) if session_info else False,
+                "has_consent": getattr(session_info, 'consent_given', False) if session_info else False,
+                "study_country": getattr(session_info, 'study_country', None) if session_info else None,
+                "study_level": getattr(session_info, 'study_level', None) if session_info else None,
+                "target_intake": getattr(session_info, 'target_intake', None) if session_info else None
+            }
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
