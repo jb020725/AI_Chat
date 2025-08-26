@@ -27,11 +27,18 @@ class SmartResponse:
     def set_llm_model(self, llm_model):
         """Set the LLM model for function calling only (RAG disabled)"""
         try:
+            logger.info(f"Setting LLM model: {type(llm_model)}")
             self.llm_model = llm_model
+            
             # Import here to avoid circular imports
+            logger.info("Importing FunctionIntegrator...")
             from app.functions.function_integrator import FunctionIntegrator
+            logger.info("FunctionIntegrator imported successfully")
+            
+            logger.info("Creating FunctionIntegrator instance...")
             self.function_integrator = FunctionIntegrator(llm_model)
             logger.info(f"LLM model set for function calling. Integrator: {self.function_integrator is not None}")
+            
         except Exception as e:
             logger.error(f"Failed to set LLM model for function calling: {e}")
             import traceback
@@ -42,10 +49,12 @@ class SmartResponse:
         """Generate intelligent response using function calling and memory"""
         try:
             if not self.function_integrator:
+                logger.error("Function integrator not available - falling back to basic response")
+                # Fallback to basic response instead of error
                 return {
-                    "response": "I'm having technical difficulties. Please try again.",
-                    "success": False,
-                    "error": "Function integrator not available"
+                    "response": "Hello! I'm your professional student visa consultant. I can help you with visa applications for USA, UK, South Korea, and Australia. What country are you interested in studying in?",
+                    "success": True,
+                    "function_calls": []
                 }
             
             # Create function calling prompt

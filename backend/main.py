@@ -415,6 +415,7 @@ async def get_status():
 if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
     try:
         # Initialize the smart response system with clean function calling
+        logger.info("About to set LLM model in smart response system...")
         smart_response.set_llm_model(model)
         logger.info("Memory system initialized with LLM model for clean function calling")
         
@@ -423,6 +424,8 @@ if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
             logger.info("Clean function calling successfully connected to smart response system")
         else:
             logger.error("Clean function calling failed to connect to smart response system")
+            logger.error(f"Function integrator status: {smart_response.function_integrator}")
+            logger.error(f"LLM model status: {smart_response.llm_model}")
             
     except Exception as e:
         logger.error(f"Failed to initialize memory system with LLM: {e}")
