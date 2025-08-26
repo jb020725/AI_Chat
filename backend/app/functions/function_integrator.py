@@ -211,114 +211,60 @@ Please provide a natural, helpful response to the user based on the function res
                 "error": str(e)
             }
     
-    def _build_function_prompt(self, user_message: str, conversation_history: List[Dict], user_info: Dict = None) -> str:
-        """Build the function calling prompt for Gemini"""
-        try:
-            prompt_parts = []
+    def _build_function_prompt(self, user_message: str, conversation_history: List[Dict], session_info: Dict) -> str:
+        """Build prompt for function calling (no RAG)"""
+        
+        # Build conversation context
+        conversation_context = ""
+        if conversation_history:
+            recent_messages = conversation_history[-6:]  # Last 6 exchanges
+            conversation_context = "\n".join([
+                f"User: {msg.get('user', '')}\nAssistant: {msg.get('assistant', '')}"
+                for msg in recent_messages
+            ])
+        
+        # Build session context
+        session_context = ""
+        if session_info:
+            session_parts = []
+            if session_info.get('country'):
+                session_parts.append(f"Target Country: {session_info['country']}")
+            if session_info.get('email'):
+                session_parts.append(f"Email: {session_info['email']}")
+            if session_info.get('name'):
+                session_parts.append(f"Name: {session_info['name']}")
+            if session_info.get('phone'):
+                session_parts.append(f"Phone: {session_info['phone']}")
+            if session_info.get('intake'):
+                session_parts.append(f"Intake: {session_info['intake']}")
             
-            # System context
-            prompt_parts.append("You are an AI assistant for AI Consultancy, specializing in student visas.")
-            prompt_parts.append("You have access to several functions to help users effectively.")
-            prompt_parts.append("")
-            
-            # Function descriptions
-            prompt_parts.append("AVAILABLE FUNCTIONS:")
-            prompt_parts.append("")
-            prompt_parts.append("FUNCTION CALLING RULES:")
-    
-            prompt_parts.append("- If user shows serious intent (wants to apply, needs guidance) OR shows time-sensitive needs (immediate help), call handle_contact_request")
-            prompt_parts.append("- If user asks about topics outside student visa scope, call define_response_strategy to redirect")
-    
-            prompt_parts.append("")
-            
-            prompt_parts.append("1. handle_contact_request(user_query, conversation_context, detected_interests?) - Smart contact handler for both lead opportunities (serious intent) and time-sensitive contact needs (immediate help). Routes appropriately based on urgency level.")
-            prompt_parts.append("2. detect_and_save_contact_info(user_query, conversation_context, extraction_mode?) - Automatically detect, extract, and save contact information from user messages. Use when user provides any contact details.")
-            prompt_parts.append("3. define_response_strategy(user_query, session_memory?) - Define response strategy for off-topic questions. Use when user asks about non-student visa topics.")
-            prompt_parts.append("")
-            
+            if session_parts:
+                session_context = f"Session Info: {', '.join(session_parts)}"
+        
+            # Build the main prompt
+        prompt = f"""You are an AI assistant representing AI Consultancy, specializing in student visa guidance for Nepali students applying to USA, UK, Australia, and South Korea.
 
-            prompt_parts.append("")
-            
-    
-            prompt_parts.append("")
-            
-            prompt_parts.append("IMPORTANT RULES:")
-    
-            prompt_parts.append("- WHEN TO CALL: When user shows serious intent (wants to apply, needs guidance) OR shows time-sensitive needs (immediate help), call handle_contact_request")
-            prompt_parts.append("- WHEN TO CALL: When user provides ANY contact information (name, email, phone, country, intake), call detect_and_save_contact_info to automatically extract and save it")
-            prompt_parts.append("- WHEN TO CALL: If user asks about topics outside student visa scope, call define_response_strategy to redirect")
-    
-            prompt_parts.append("- RESPONSE STRATEGIES: Follow the strategy defined by define_response_strategy function exactly")
-            prompt_parts.append("- CONTACT COLLECTION: Always detect opportunities to collect contact information when users show serious intent")
-            prompt_parts.append("")
-            
-            # User message
-            prompt_parts.append(f"USER MESSAGE: {user_message}")
-            prompt_parts.append("")
-            
-            # Check if contact info is provided and add explicit instruction
-            message_lower = user_message.lower()
-            has_email = "@" in user_message
-            has_name = any(phrase in message_lower for phrase in ["my name is", "i'm", "i am", "call me", "name is", "name's"])
-            has_phone = any(char.isdigit() for char in user_message) and len([c for c in user_message if c.isdigit()]) >= 7
-            
-            # More aggressive pattern matching for contact info
-            if "email" in message_lower or "phone" in message_lower or "contact" in message_lower:
-                has_email = True
-                has_phone = True
-            
-            if has_email or has_name or has_phone:
-                prompt_parts.append("NOTE: CONTACT INFO DETECTED: Call detect_and_save_contact_info function to automatically extract and save the information!")
-                prompt_parts.append("")
-            
-            # Conversation history
-            if conversation_history:
-                prompt_parts.append("CONVERSATION HISTORY:")
-                for i, msg in enumerate(conversation_history[-3:], 1):
-                    user_msg = msg.get('user_input') or msg.get('user_message', 'Unknown')
-                    bot_msg = msg.get('bot_response', 'Unknown')
-                    prompt_parts.append(f"{i}. User: {user_msg}")
-                    prompt_parts.append(f"   Assistant: {bot_msg}")
-                prompt_parts.append("")
-            
-            # User info context
-            if user_info:
-                prompt_parts.append("USER CONTEXT:")
-                if user_info.get('country'):
-                    prompt_parts.append(f"- Target Country: {user_info['country']}")
-                if user_info.get('name'):
-                    prompt_parts.append(f"- Name: {user_info['name']}")
-                if user_info.get('email'):
-                    prompt_parts.append(f"- Email: {user_info['email']}")
-                if user_info.get('phone'):
-                    prompt_parts.append(f"- Phone: {user_info['phone']}")
-                if user_info.get('intake'):
-                    prompt_parts.append(f"- Intake: {user_info['intake']}")
-                prompt_parts.append("")
-            
-            prompt_parts.append("INSTRUCTIONS:")
-            prompt_parts.append("1. Analyze the user's message and conversation context")
-            prompt_parts.append("2. Determine if you need to call any functions")
-            prompt_parts.append("3. If calling functions, provide ALL required parameters")
-            prompt_parts.append("4. Be natural and conversational in your response")
-            prompt_parts.append("5. Use functions to provide accurate information and save leads when appropriate")
-            prompt_parts.append("")
-            prompt_parts.append("COUNTRY EXTRACTION EXAMPLES:")
-            prompt_parts.append("- 'i wanna go to uk' → country: 'uk'")
-            prompt_parts.append("- 'USA student visa' → country: 'usa'")
-            prompt_parts.append("- 'Australia requirements' → country: 'australia'")
-            prompt_parts.append("- 'South Korea process' → country: 'south_korea'")
-            prompt_parts.append("")
-            prompt_parts.append("RESPOND WITH:")
-            prompt_parts.append("- Function calls if needed (with proper parameters)")
-            prompt_parts.append("- Natural, helpful response to the user")
-            prompt_parts.append("- Continue the conversation naturally")
-            
-            return "\n".join(prompt_parts)
-            
-        except Exception as e:
-            self.logger.error(f"Error building function prompt: {e}")
-            return f"User message: {user_message}\n\nPlease help the user with their student visa questions."
+{session_context}
+
+{conversation_context}
+
+Current user message: {user_message}
+
+Instructions:
+- If the user provides contact information (name, email, phone, country, intake), use the detect_and_save_contact_info function
+- If the user shows serious intent to apply or needs immediate assistance, use the handle_contact_request function
+- For general visa questions, provide helpful responses using your knowledge
+- Always be helpful, professional, and encourage users to share their contact details for personalized guidance
+- Respond naturally like a friendly chatbot
+
+Available functions:
+- detect_and_save_contact_info: Automatically extract and save contact information
+- handle_contact_request: Handle serious inquiries and contact requests
+- define_response_strategy: Define response strategy for complex queries
+
+Respond naturally and use functions when appropriate to enhance the user experience."""
+
+        return prompt
     
     def _process_function_response(self, response, user_message: str, conversation_history: List[Dict], session_id: str) -> Dict[str, Any]:
         """Process Gemini response and execute function calls"""

@@ -61,7 +61,7 @@ FUNCTIONS = [
     },
     {
         "name": "define_response_strategy",
-        "description": "Define response strategy when RAG returns no results. Student visa topics from Nepal to USA, UK, South Korea, Australia only.",
+        "description": "Define response strategy for complex student visa queries. Student visa topics from Nepal to USA, UK, South Korea, Australia only.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -69,16 +69,17 @@ FUNCTIONS = [
                     "type": "string",
                     "description": "User's question to analyze for response strategy"
                 },
-                "rag_results_count": {
-                    "type": "integer",
-                    "description": "Number of results from RAG search (0 means no results)"
+                "query_complexity": {
+                    "type": "string",
+                    "description": "Complexity level of the query",
+                    "enum": ["simple", "moderate", "complex", "very_complex"]
                 },
                 "session_memory": {
                     "type": "object",
                     "description": "User's session memory and conversation history"
                 }
             },
-            "required": ["user_query", "rag_results_count"]
+            "required": ["user_query", "query_complexity"]
         }
     }
 ]

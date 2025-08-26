@@ -19,16 +19,16 @@ class SmartResponseGenerator:
         logger.info("Smart Response Generator initialized")
     
     def set_llm_model(self, llm_model):
-        """Set the LLM model for RAG-LLM integration"""
+        """Set the LLM model for function calling only (RAG disabled)"""
         try:
-            from app.rag.llm_integration import get_rag_llm_integrator
-            self.rag_llm_integrator = get_rag_llm_integrator(llm_model)
-            logger.info(f"LLM model set for RAG-LLM integration. Integrator: {self.rag_llm_integrator is not None}")
+            from app.functions.function_integrator import FunctionIntegrator
+            self.function_integrator = FunctionIntegrator(llm_model)
+            logger.info(f"LLM model set for function calling only. Function Integrator: {self.function_integrator is not None}")
         except Exception as e:
             logger.error(f"Failed to set LLM model: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
-            self.rag_llm_integrator = None
+            self.function_integrator = None
     
     def generate_response(self, 
                          user_message: str, 
@@ -51,63 +51,50 @@ class SmartResponseGenerator:
             # Get current session info
             session_info = self.memory.get_user_info(session_id)
             
-            # NEW APPROACH: LLM Primary, RAG Secondary - Only get RAG when LLM needs support
-            rag_context = []  # Start with no RAG context
-            logger.info("🔄 LLM-first approach: Starting with no RAG context")
-            
-            # Build the response
-            response_parts = []
+            # NEW APPROACH: Function Calling Only - No RAG
+            logger.info("🔄 Function calling approach: No RAG context")
             
             # Import domain checker
             from app.utils.domain_checker import is_in_domain
             
-            # Debug: Check if RAG-LLM integrator is available
-            logger.info(f"RAG-LLM integrator available: {self.rag_llm_integrator is not None}")
+            # Debug: Check if function integrator is available
+            logger.info(f"Function integrator available: {self.function_integrator is not None}")
             logger.info(f"User message: {user_message}")
-            logger.info(f"RAG context: {rag_context[:100]}...")
             logger.info(f"Session info: {session_info.__dict__ if hasattr(session_info, '__dict__') else session_info}")
             
-            # NEW LOGIC: LLM Primary, RAG Secondary
-            rag_results_count = len(rag_context) if isinstance(rag_context, list) else 0
-            logger.info(f"RAG results count: {rag_results_count}")
-            
-            # Import domain checker
-            from app.utils.domain_checker import is_in_domain
+            # Check domain
             domain_check = is_in_domain(user_message)
             logger.info(f"Domain check result: {domain_check}")
             
-            # Option 1: In domain - use LLM with optional RAG support
+            # Option 1: In domain - use function calling
             if domain_check.get('in_domain', False):
-                logger.info("✅ In domain - using LLM primary with optional RAG support")
+                logger.info("✅ In domain - using function calling")
                 
-                # Use LLM with RAG as supplementary (only if LLM needs support)
-                if self.rag_llm_integrator:
+                # Use function calling for enhanced responses
+                if self.function_integrator:
                     try:
-                        # RAG TURNED OFF: Use LLM knowledge only
-                        result = self.rag_llm_integrator.process_query(
+                        result = self.function_integrator.process_with_functions(
                             user_message=user_message,
-                            session_info=session_info.__dict__ if hasattr(session_info, '__dict__') else session_info,
-                            conversation_history=conversation_history,
-                            top_k=0,  # No RAG retrieval
                             session_id=session_id,
-                            rag_context=[]  # Empty RAG context - LLM only
+                            conversation_history=conversation_history,
+                            session_info=session_info.__dict__ if hasattr(session_info, '__dict__') else session_info
                         )
                         
                         if result.get('processing_successful') and result.get('llm_response'):
                             return result.get('llm_response')
                         else:
-                            # Fallback to pure LLM response
+                            # Fallback to basic domain response
                             return self._handle_domain_query_with_functions(
                                 user_message, session_id, conversation_history, session_info
                             )
                     except Exception as e:
-                        logger.error(f"LLM processing failed: {e}")
-                        # Fallback to pure LLM response
+                        logger.error(f"Function calling failed: {e}")
+                        # Fallback to basic domain response
                         return self._handle_domain_query_with_functions(
                             user_message, session_id, conversation_history, session_info
                         )
                 else:
-                    # No integrator - use pure LLM
+                    # No function integrator - use basic response
                     return self._handle_domain_query_with_functions(
                         user_message, session_id, conversation_history, session_info
                     )
@@ -152,26 +139,25 @@ class SmartResponseGenerator:
 
     def _handle_domain_query_with_functions(self, user_message: str, session_id: str, 
                                           conversation_history: List[Dict], session_info: Any) -> str:
-        """Handle domain queries using functions when RAG has no results"""
+        """Handle domain queries using function calling only"""
         try:
-            logger.info("Handling domain query with functions")
+            logger.info("Handling domain query with function calling")
             
             # Try to use function integrator if available
-            if self.rag_llm_integrator:
+            if self.function_integrator:
                 try:
-                    result = self.rag_llm_integrator.process_query(
+                    result = self.function_integrator.process_with_functions(
                         user_message=user_message,
-                        session_info=session_info.__dict__ if hasattr(session_info, '__dict__') else session_info,
+                        session_id=session_id,
                         conversation_history=conversation_history,
-                        top_k=0,  # No RAG results
-                        session_id=session_id
+                        session_info=session_info.__dict__ if hasattr(session_info, '__dict__') else session_info
                     )
                     
                     if result.get('processing_successful') and result.get('llm_response'):
                         return result.get('llm_response')
                     
                 except Exception as e:
-                    logger.error(f"Function processing failed: {e}")
+                    logger.error(f"Function calling failed: {e}")
             
             # Fallback to basic domain response
             return self._generate_basic_domain_response(user_message)
@@ -215,18 +201,15 @@ class SmartResponseGenerator:
         try:
             prompt_parts = []
             
-            # System context with policy rules
+            # System context
             prompt_parts.append("You are an AI assistant for AI Consultancy, specializing in student visas.")
             prompt_parts.append("A function has been executed successfully. Generate a natural, helpful response.")
             prompt_parts.append("")
-            prompt_parts.append("SYSTEM POLICY RULES:")
-            prompt_parts.append("1. Keep responses CONCISE and SUMMARIZED (2-3 sentences max)")
-            prompt_parts.append("2. Only provide detailed explanations when user specifically asks for 'more details', 'explain more', etc.")
-            prompt_parts.append("3. Ask for lead fields only after you've helped OR user shows interest; ask 1-2 max with explicit opt-in")
-            prompt_parts.append("4. Be conversational and natural - don't be overly formal")
-            prompt_parts.append("5. If no KB match above threshold, say what's missing and ask a disambiguating question")
-            prompt_parts.append("6. Focus on the most relevant information")
-            prompt_parts.append("7. Avoid repetition and unnecessary details")
+            prompt_parts.append("RESPONSE GUIDELINES:")
+            prompt_parts.append("1. Respond naturally like a friendly chatbot")
+            prompt_parts.append("2. Be conversational and helpful")
+            prompt_parts.append("3. Focus on the most relevant information")
+            prompt_parts.append("4. Avoid repetition and unnecessary details")
             prompt_parts.append("")
             
             # User's original question
@@ -260,22 +243,17 @@ class SmartResponseGenerator:
                     prompt_parts.append(f"- User: {content}")
             
             # Instructions based on function type
-
-
-            elif function_name == "detect_and_save_contact_info":
+            if function_name == "detect_and_save_contact_info":
                 prompt_parts.append("\nInstructions:")
-                prompt_parts.append("1. Briefly acknowledge the information was saved")
-                prompt_parts.append("2. Continue helping with the user's questions naturally")
-                prompt_parts.append("3. Keep response concise (1-2 sentences)")
+                prompt_parts.append("1. Thank the user for sharing their contact information")
+                prompt_parts.append("2. Mention that you've saved it for further guidance")
+                prompt_parts.append("3. Continue helping with the user's questions naturally")
                 prompt_parts.append("4. Be conversational and helpful")
-                
-
             else:
                 prompt_parts.append("\nInstructions:")
-                prompt_parts.append("1. Briefly acknowledge the function was successful")
-                prompt_parts.append("2. Continue helping the user naturally")
-                prompt_parts.append("3. Keep response concise (1-2 sentences)")
-                prompt_parts.append("4. Be conversational and helpful")
+                prompt_parts.append("1. Continue helping the user naturally")
+                prompt_parts.append("2. Be conversational and helpful")
+                prompt_parts.append("3. Focus on their question or request")
             
             return "\n".join(prompt_parts)
             

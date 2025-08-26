@@ -38,15 +38,9 @@ from app.utils.paths import CFG
 from app.utils.logging_config import setup_clean_logging
 from app.config import settings
 
-# Import RAG components
-try:
-    from app.rag.retriever import retrieve
-    from app.rag.loader import load_documents
-    from app.rag.llm_integration import get_rag_llm_integrator
-    RAG_AVAILABLE = True
-except ImportError as e:
-    print(f"RAG not available: {e}")
-    RAG_AVAILABLE = False
+# RAG components are kept in folder but not imported or used
+RAG_AVAILABLE = False
+RAG_ENABLED = False
 
 # Import Memory Management components
 try:
@@ -92,16 +86,9 @@ if GEMINI_AVAILABLE:
     genai.configure(api_key=settings.GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-2.5-flash')
     
-    # Initialize RAG-LLM integration with the model
-    if RAG_AVAILABLE:
-        try:
-            rag_llm_integrator = get_rag_llm_integrator(model)
-            logger.info("RAG-LLM integration initialized with Gemini model")
-        except Exception as e:
-            logger.error(f"Failed to initialize RAG-LLM integration: {e}")
-            rag_llm_integrator = None
-    else:
-        rag_llm_integrator = None
+    # RAG-LLM integration is not used (files kept but not imported)
+    rag_llm_integrator = None
+    logger.info("RAG-LLM integration not used - using function calling only")
 else:
     model = None
     rag_llm_integrator = None
@@ -185,57 +172,7 @@ def extract_user_info(message: str) -> Dict[str, str]:
     
     return user_info
 
-def get_rag_context(query: str, top_k: int = 3) -> str:
-    """Get relevant context from RAG"""
-    if not RAG_AVAILABLE:
-        return "RAG system not available. Using general knowledge."
-    
-    try:
-        # Check if this is a general greeting or non-specific query
-        general_queries = ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening', 'how are you', 'what can you do']
-        if query.lower().strip() in general_queries:
-            return "No specific information found in knowledge base."
-        
-        # First try to get country-specific results
-        countries = ['usa', 'uk', 'south_korea', 'australia']
-        country_found = None
-        
-        for country in countries:
-            # Check both the country code and the formatted version
-            if (country in query.lower() or 
-                country.replace('_', ' ') in query.lower() or
-                country.replace('_', ' ').title() in query or
-                country.replace('_', ' ').lower() in query.lower()):
-                country_found = country
-                break
-        
-        if country_found:
-            # Get country-specific results
-            results = retrieve(query, top_k=top_k, country=country_found)
-            if results:
-                context = "\n\n".join([
-                    f"Source: {r.get('title', 'Unknown')}\n{r.get('content', '')[:500]}..."
-                    for r in results[:top_k]
-                ])
-                return f"Relevant {country_found.replace('_', ' ').title()} Visa Information:\n{context}"
-        
-        # For specific visa-related queries (not general greetings), do a general search
-        visa_keywords = ['visa', 'student', 'study', 'university', 'college', 'application', 'requirements', 'documents']
-        if any(keyword in query.lower() for keyword in visa_keywords):
-            results = retrieve(query, top_k=top_k)
-            if results:
-                context = "\n\n".join([
-                    f"Source: {r.get('title', 'Unknown')}\n{r.get('content', '')[:500]}..."
-                    for r in results[:top_k]
-                ])
-                return f"Relevant Information:\n{context}"
-        
-        # If no specific query and no visa keywords, return no information
-        return "No specific information found in knowledge base."
-        
-    except Exception as e:
-        logger.error(f"RAG retrieval error: {e}")
-        return "RAG system error. Using general knowledge."
+# RAG context function removed - not used in function calling approach
 
 # Legacy functions removed - now handled by function calling integration
 
@@ -250,7 +187,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Index Directory: {CFG.INDEX_DIR}")
     logger.info(f"Lead Capture: {'Available' if LEAD_CAPTURE_AVAILABLE else 'Not Available'}")
     logger.info(f"Memory System: {'Available' if MEMORY_AVAILABLE else 'Not Available'}")
-    logger.info(f"RAG System: {'Available' if RAG_AVAILABLE else 'Not Available'}")
+    logger.info(f"RAG System: Not Used (files kept but not imported)")
     logger.info(f"Gemini AI: {'Available' if GEMINI_AVAILABLE else 'Not Available'}")
     logger.info(f"Rate Limiting: 120/minute, 2000/hour per IP (Gemini 2.5 Flash)")
     logger.info(f"Concurrency Control: Max 20 concurrent LLM calls (Gemini 2.5 Flash)")
@@ -336,21 +273,11 @@ async def api_info():
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    # Check RAG system health
-    rag_status = "Not Available"
-    if RAG_AVAILABLE:
-        try:
-            from app.rag.embedder import get_embedder
-            embedder = get_embedder()
-            rag_status = embedder.get_index_info()
-        except Exception as e:
-            rag_status = f"Error: {str(e)}"
-    
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "rag_available": RAG_AVAILABLE,
-        "rag_status": rag_status,
+        "rag_available": False,
+        "rag_status": "Not Used (files kept but not imported)",
         "gemini_available": GEMINI_AVAILABLE,
         "memory_available": MEMORY_AVAILABLE,
         "lead_capture_available": LEAD_CAPTURE_AVAILABLE,
@@ -367,13 +294,8 @@ async def health_check():
 @app.get("/healthz")
 async def healthz():
     """Lightweight health check for Cloud Run"""
-    try:
-        from app.rag.embedder import get_embedder
-        embedder = get_embedder()
-        ready = embedder.is_available()
-        return {"ready": ready}, 200 if ready else 503
-    except Exception as e:
-        return {"ready": False, "error": str(e)}, 503
+    # Simple health check - no RAG dependency
+    return {"ready": True}, 200
 
 @app.post("/api/chat", response_model=ChatResponse)
 @limiter.limit("60/minute")  # 60 requests per minute per IP
@@ -399,14 +321,14 @@ async def chat(request: Request, chat_request: ChatRequest):
                 updated_session = memory.get_user_info(session_id)
                 logger.info(f"Session after update: country={updated_session.country}, email={updated_session.email}")
         
-        # Generate smart response with memory integration and function calling
+        # Generate smart response with memory integration and function calling (NO RAG)
         if MEMORY_AVAILABLE:
             smart_generator = get_smart_response_generator()
             
-            # Set the LLM model in the smart generator so it can use RAG-LLM integration
+            # Set the LLM model in the smart generator for function calling
             if GEMINI_AVAILABLE and model:
                 smart_generator.set_llm_model(model)
-                logger.info("LLM model set in smart response generator")
+                logger.info("LLM model set in smart response generator for function calling")
             
             # Get conversation history for the smart generator
             memory = get_session_memory()
@@ -429,9 +351,8 @@ async def chat(request: Request, chat_request: ChatRequest):
             except Exception as e:
                 logger.warning(f"Failed to track conversation exchange: {e}")
         else:
-            # Fallback to basic RAG
-            context = get_rag_context(chat_request.message)
-            ai_response = f"Based on the information I have: {context}"
+            # Fallback to basic response (NO RAG)
+            ai_response = "I can help you with student visa information for USA, UK, Australia, and South Korea. Please share your contact details and preferred country for personalized guidance."
         
         # Lead saving is now handled by function calling integration
         
@@ -500,7 +421,7 @@ async def get_system_info():
         },
         "data_structure": {
             "available_countries": ["USA", "UK", "Australia", "South Korea"],
-            "index_files": list(CFG.INDEX_DIR.glob("*.faiss")) if CFG.INDEX_DIR.exists() else [],
+            "rag_files": "Kept in folder but not used",
             "data_files": list(CFG.DATA_DIR.glob("**/*.jsonl")) if CFG.DATA_DIR.exists() else []
         },
         "rate_limiting": {
@@ -526,7 +447,7 @@ async def get_status():
         "timestamp": datetime.now().isoformat(),
         "version": "2.0.0",
         "components": {
-            "rag_system": "operational" if RAG_AVAILABLE else "unavailable",
+            "rag_system": "not_used",
             "memory_system": "operational" if MEMORY_AVAILABLE else "unavailable",
             "lead_capture": "operational" if LEAD_CAPTURE_AVAILABLE else "unavailable",
             "gemini_ai": "operational" if GEMINI_AVAILABLE else "unavailable",
@@ -540,26 +461,19 @@ async def get_status():
 
 
 
-# Initialize Memory System with LLM model
+# Initialize Memory System with LLM model (Function Calling Only)
 if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
     try:
-        # First create the RAG-LLM integrator
-        if RAG_AVAILABLE:
-            rag_llm_integrator = get_rag_llm_integrator(model)
-            logger.info("RAG-LLM integration initialized with Gemini model")
-        else:
-            rag_llm_integrator = None
-            
-        # Then initialize the smart response generator
+        # Initialize the smart response generator with function calling only
         smart_generator = get_smart_response_generator()
         smart_generator.set_llm_model(model)
-        logger.info("Memory system initialized with LLM model")
+        logger.info("Memory system initialized with LLM model for function calling")
         
         # Verify the integration
-        if smart_generator.rag_llm_integrator:
-            logger.info("RAG-LLM integration successfully connected to smart response generator")
+        if smart_generator.function_integrator:
+            logger.info("Function calling successfully connected to smart response generator")
         else:
-            logger.error("RAG-LLM integration failed to connect to smart response generator")
+            logger.error("Function calling failed to connect to smart response generator")
             
     except Exception as e:
         logger.error(f"Failed to initialize memory system with LLM: {e}")
