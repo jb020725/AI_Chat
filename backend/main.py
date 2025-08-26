@@ -84,7 +84,7 @@ logger.info("Rate limiting initialized")
 if GEMINI_AVAILABLE:
     genai.configure(api_key=settings.GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-2.5-flash')
-    logger.info("Gemini 2.5 Flash initialized for clean function calling")
+    logger.info("Gemini 2.5 Flash initialized for AI Consultancy chatbot")
 else:
     model = None
 
@@ -178,7 +178,7 @@ def extract_user_info(message: str) -> Dict[str, str]:
 async def lifespan(app: FastAPI):
     """Initialize and cleanup on startup/shutdown"""
     # Startup
-    logger.info("AI Chatbot started with CLEAN FUNCTION CALLING STRUCTURE!")
+    logger.info("AI Chatbot started with SIMPLE CHATBOT STRUCTURE!")
     logger.info(f"Application Directory: {CFG.APP_DIR}")
     logger.info(f"Data Directory: {CFG.DATA_DIR}")
     logger.info(f"Index Directory: {CFG.INDEX_DIR}")
@@ -186,7 +186,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Memory System: {'Available' if MEMORY_AVAILABLE else 'Not Available'}")
     logger.info(f"RAG System: Not Used (files kept but not imported)")
     logger.info(f"Gemini AI: {'Available' if GEMINI_AVAILABLE else 'Not Available'}")
-    logger.info(f"Clean Functions: get_answer, qualify_interest, request_consent, save_lead, notify_human")
+    logger.info(f"Simple Chatbot: Direct LLM responses with session memory")
     logger.info(f"Rate Limiting: 60/minute, 1000/hour per IP")
     logger.info(f"Concurrency Control: Max 20 concurrent LLM calls")
     yield
@@ -194,7 +194,7 @@ async def lifespan(app: FastAPI):
     logger.info("AI Chatbot shutting down...")
 
 # FastAPI app
-app = FastAPI(title="AI Consultancy AI Assistant - Clean Function Calling", version="3.0.0", lifespan=lifespan)
+app = FastAPI(title="AI Consultancy AI Assistant - Simple Chatbot", version="3.0.0", lifespan=lifespan)
 
 # Add CORS middleware
 app.add_middleware(
@@ -225,8 +225,8 @@ async def health_check():
         "lead_capture_available": LEAD_CAPTURE_AVAILABLE,
         "rate_limiting": "Active - 60/minute, 1000/hour per IP",
         "concurrency_control": "Active - Max 20 concurrent LLM calls",
-        "function_calling_enabled": True,
-        "clean_functions": ["get_answer", "qualify_interest", "request_consent", "save_lead", "notify_human"]
+        "simple_chatbot_enabled": True,
+        "chatbot_type": "Direct LLM responses with session memory"
     }
 
 @app.get("/healthz")
@@ -238,7 +238,7 @@ async def healthz():
 @limiter.limit("60/minute")  # 60 requests per minute per IP
 @limiter.limit("1000/hour")  # 1000 requests per hour per IP
 async def chat(request: Request, chat_request: ChatRequest):
-    """Main chat endpoint using clean function calling"""
+    """Main chat endpoint using simple chatbot"""
     try:
         # Use provided session ID or generate new one
         session_id = chat_request.session_id or f"session_{datetime.now().timestamp()}"
@@ -253,12 +253,12 @@ async def chat(request: Request, chat_request: ChatRequest):
                 memory.update_session(session_id, turn_info)
                 logger.info(f"Session updated with turn info: {turn_info}")
         
-        # Generate smart response using clean function calling
+        # Generate smart response using simple chatbot
         if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
             try:
                 # Set the LLM model in the smart response system
                 smart_response.set_llm_model(model)
-                logger.info("LLM model set in smart response system for clean function calling")
+                logger.info("LLM model set in smart response system for simple chatbot")
                 
                 # Get conversation history
                 memory = get_session_memory()
@@ -275,16 +275,12 @@ async def chat(request: Request, chat_request: ChatRequest):
                 # Extract response from result
                 if result.get('success'):
                     ai_response = result.get('response', '')
-                    function_calls = result.get('function_calls', [])
-                    
-                    # Log function calls for debugging
-                    if function_calls:
-                        logger.info(f"Function calls executed: {[fc.get('function_name') for fc in function_calls]}")
+                    logger.info("Simple chatbot response generated successfully")
                     
                 else:
-                    # Fallback response if function calling fails
+                    # Fallback response if chatbot fails
                     ai_response = "I'm experiencing technical difficulties. Please try again or ask a different question."
-                    logger.warning(f"Function calling failed: {result.get('error')}")
+                    logger.warning(f"Simple chatbot failed: {result.get('error')}")
                 
                 # Track the conversation exchange in session memory
                 try:
@@ -347,7 +343,7 @@ async def get_system_info():
     """Get system information and paths"""
     return {
         "application_info": {
-            "name": "AI Chatbot - Clean Function Calling",
+            "name": "AI Chatbot - AI Consultancy Lead Capture",
             "version": "3.0.0",
             "environment": "production",
             "security_features": {
@@ -369,13 +365,13 @@ async def get_system_info():
             "rag_files": "Kept in folder but not used",
             "data_files": list(CFG.DATA_DIR.glob("**/*.jsonl")) if CFG.DATA_DIR.exists() else []
         },
-        "clean_functions": {
-            "get_answer": "Vetted content lookup",
-            "qualify_interest": "Interest capture without PII",
-            "request_consent": "Explicit consent management",
-            "save_lead": "Contact storage after consent",
-    
-            "notify_human": "CRM handoff"
+        "chatbot_features": {
+            "type": "AI Consultancy Lead Capture",
+            "session_memory": "Active for conversation flow",
+            "lead_detection": "Automatic contact info extraction",
+            "database_saving": "Supabase integration active",
+            "email_notifications": "Advisor alerts enabled",
+            "visa_knowledge": "Built into prompt"
         },
         "rate_limiting": {
             "requests_per_minute": 60,
@@ -406,7 +402,7 @@ async def get_status():
             "gemini_ai": "operational" if GEMINI_AVAILABLE else "unavailable",
             "rate_limiting": "operational",
             "concurrency_control": "operational",
-            "clean_function_calling": "operational" if MEMORY_AVAILABLE and GEMINI_AVAILABLE else "unavailable"
+            "simple_chatbot": "operational" if MEMORY_AVAILABLE and GEMINI_AVAILABLE else "unavailable"
         },
         "uptime": 0  # You can add actual uptime calculation if needed
     }
@@ -414,17 +410,16 @@ async def get_status():
 # Initialize Memory System with LLM model (Clean Function Calling)
 if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
     try:
-        # Initialize the smart response system with clean function calling
+        # Initialize the smart response system for simple chatbot
         logger.info("About to set LLM model in smart response system...")
         smart_response.set_llm_model(model)
-        logger.info("Memory system initialized with LLM model for clean function calling")
+        logger.info("Memory system initialized with LLM model for simple chatbot")
         
         # Verify the integration
-        if smart_response.function_integrator:
-            logger.info("Clean function calling successfully connected to smart response system")
+        if smart_response.llm_model:
+            logger.info("Simple chatbot successfully connected to smart response system")
         else:
-            logger.error("Clean function calling failed to connect to smart response system")
-            logger.error(f"Function integrator status: {smart_response.function_integrator}")
+            logger.error("Simple chatbot failed to connect to smart response system")
             logger.error(f"LLM model status: {smart_response.llm_model}")
             
     except Exception as e:

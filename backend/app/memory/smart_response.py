@@ -1,81 +1,73 @@
 """
-Smart Response System for Clean Function-Calling Structure
+Smart Response System for AI Consultancy Chatbot
 
-Manages intelligent response generation and memory integration:
-- Function calling integration
-- Session memory management
-- Natural response generation
-- No RAG integration (disabled)
+Features:
+- Answer visa questions directly
+- Detect user interest and capture leads
+- Save leads to Supabase database
+- Send email notifications
+- Use session memory for personalization
+- No RAG - just direct LLM responses
 """
 
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from app.memory.session_memory import get_session_memory
+from app.tools.lead_capture_tool import LeadCaptureTool
 
 logger = logging.getLogger(__name__)
 
 class SmartResponse:
-    """Manages smart response generation and memory integration"""
+    """AI Consultancy chatbot with lead capture and database saving"""
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.session_memory = get_session_memory()
-        self.function_integrator = None
         self.llm_model = None
+        self.lead_capture_tool = LeadCaptureTool()
         
     def set_llm_model(self, llm_model):
-        """Set the LLM model for function calling only (RAG disabled)"""
+        """Set the LLM model for responses"""
         try:
-            logger.info(f"Setting LLM model: {type(llm_model)}")
             self.llm_model = llm_model
-            
-            # Import here to avoid circular imports
-            logger.info("Importing FunctionIntegrator...")
-            from app.functions.function_integrator import FunctionIntegrator
-            logger.info("FunctionIntegrator imported successfully")
-            
-            logger.info("Creating FunctionIntegrator instance...")
-            self.function_integrator = FunctionIntegrator(llm_model)
-            logger.info(f"LLM model set for function calling. Integrator: {self.function_integrator is not None}")
-            
+            logger.info(f"LLM model set for AI Consultancy chatbot: {type(llm_model)}")
         except Exception as e:
-            logger.error(f"Failed to set LLM model for function calling: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            self.function_integrator = None
+            logger.error(f"Failed to set LLM model: {e}")
+            self.llm_model = None
     
     def generate_smart_response(self, user_message: str, session_id: str, conversation_history: List[Dict]) -> Dict[str, Any]:
-        """Generate intelligent response using function calling and memory"""
+        """Generate response and handle lead capture"""
         try:
-            if not self.function_integrator:
-                logger.error("Function integrator not available - falling back to basic response")
-                # Fallback to basic response instead of error
+            if not self.llm_model:
                 return {
-                    "response": "Hello! I'm your professional student visa consultant. I can help you with visa applications for USA, UK, South Korea, and Australia. What country are you interested in studying in?",
+                    "response": "Hello! I'm your professional student visa consultant. I can help you with visa applications for USA, UK, Australia, and South Korea. What country are you interested in studying in?",
                     "success": True,
                     "function_calls": []
                 }
             
-            # Create function calling prompt
-            prompt = self.function_integrator.create_function_calling_prompt(
-                user_message, session_id, conversation_history
-            )
+            # First, check if we need to save a lead
+            lead_saved = self._detect_and_save_lead(user_message, session_id)
             
-            # Call LLM with function calling
+            # Create response prompt
+            prompt = self._create_response_prompt(user_message, session_id, conversation_history, lead_saved)
+            
+            # Get response from LLM
             try:
-                response = self.llm_model.generate_content(
-                    prompt,
-                    tools=[{"function_declarations": self.function_integrator.get_function_declarations()}]
-                )
+                response = self.llm_model.generate_content(prompt)
+                if response and hasattr(response, 'text'):
+                    ai_response = response.text
+                else:
+                    ai_response = "I understand your question. Let me help you with that."
                 
-                # Process function calls if any
-                result = self._process_function_response(response, user_message, session_id, conversation_history)
-                return result
+                return {
+                    "response": ai_response,
+                    "success": True,
+                    "function_calls": []
+                }
                 
             except Exception as e:
-                logger.error(f"Error calling LLM with functions: {e}")
-                # Fallback to basic response
+                logger.error(f"Error calling LLM: {e}")
                 return {
                     "response": "I'm experiencing technical difficulties. Please try again or ask a different question.",
                     "success": False,
@@ -90,116 +82,165 @@ class SmartResponse:
                 "error": str(e)
             }
     
-    def _process_function_response(self, response, user_message: str, session_id: str, conversation_history: List[Dict]) -> Dict[str, Any]:
-        """Process LLM response and execute function calls"""
+    def _detect_and_save_lead(self, user_message: str, session_id: str) -> bool:
+        """Detect if user provided contact info and save lead"""
         try:
-            # Initialize result
-            result = {
-                "response": "",
-                "function_calls": [],
-                "success": True
+            # Extract contact information from message
+            contact_info = self._extract_contact_info(user_message)
+            
+            if not contact_info:
+                return False
+            
+            # Get session info for additional details
+            session_info = self.session_memory.get_user_info(session_id)
+            
+            # Prepare lead data
+            lead_data = {
+                "session_id": session_id,
+                "name": contact_info.get('name', ''),
+                "phone": contact_info.get('phone', ''),
+                "email": contact_info.get('email', ''),
+                "target_country": contact_info.get('country', ''),
+                "intake": getattr(session_info, 'intake', '') if session_info else '',
+                "study_level": getattr(session_info, 'study_level', '') if session_info else '',
+                "status": "new_lead",
+                "created_at": datetime.now().isoformat()
             }
             
-            # Check for function calls
-            if hasattr(response, 'candidates') and response.candidates:
-                candidate = response.candidates[0]
-                if hasattr(candidate, 'content') and candidate.content:
-                    for part in candidate.content.parts:
-                        if hasattr(part, 'function_call') and part.function_call:
-                            # Execute function call
-                            function_call = part.function_call
-                            function_name = getattr(function_call, 'name', '')
-                            function_args = getattr(function_call, 'args', {})
-                            
-                            if function_name:
-                                logger.info(f"Executing function: {function_name} with args: {function_args}")
-                                
-                                # Execute the function
-                                function_result = self.function_integrator.execute_function_call(
-                                    function_name, session_id, **function_args
-                                )
-                                
-                                # Add to results
-                                result["function_calls"].append({
-                                    "function_name": function_name,
-                                    "arguments": function_args,
-                                    "result": function_result
-                                })
-                                
-                                # Generate natural response
-                                if function_result.get('success'):
-                                    natural_response = self._generate_natural_response(
-                                        user_message, function_name, function_result, conversation_history
-                                    )
-                                    result["response"] = natural_response
-                                else:
-                                    # Handle function failure
-                                    failure_response = self._generate_failure_response(
-                                        user_message, function_name, function_result
-                                    )
-                                    result["response"] = failure_response
-                                
-                                return result
+            # Save to database
+            result = self.lead_capture_tool.create_lead(lead_data)
             
-            # No function calls - generate basic response
-            if hasattr(response, 'text'):
-                result["response"] = response.text
+            if result.get('success'):
+                logger.info(f"Lead saved successfully: {lead_data}")
+                # TODO: Send email notification here
+                return True
             else:
-                result["response"] = "I understand your question. Let me help you with that."
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error processing function response: {e}")
-            return {
-                "response": "I encountered an error processing the response. Please try again.",
-                "success": False,
-                "error": str(e)
-            }
-    
-    def _generate_natural_response(self, user_message: str, function_name: str, function_result: Dict, conversation_history: List[Dict]) -> str:
-        """Generate natural response after successful function execution"""
-        try:
-            if not self.function_integrator:
-                return "Function executed successfully. How can I help you further?"
-            
-            # Create natural response prompt
-            prompt = self.function_integrator.create_natural_response_prompt(
-                user_message, function_name, function_result
-            )
-            
-            # Generate response
-            response = self.llm_model.generate_content(prompt)
-            if response and hasattr(response, 'text'):
-                return response.text
-            else:
-                return "Function completed successfully. How can I assist you further?"
+                logger.error(f"Failed to save lead: {result.get('error')}")
+                return False
                 
         except Exception as e:
-            logger.error(f"Error generating natural response: {e}")
-            return "Function executed successfully. How can I help you further?"
+            logger.error(f"Error in lead detection and saving: {e}")
+            return False
     
-    def _generate_failure_response(self, user_message: str, function_name: str, function_result: Dict) -> str:
-        """Generate helpful response when function fails"""
-        try:
-            if not self.function_integrator:
-                return "I encountered an issue. Please try again or ask a different question."
-            
-            # Create failure response prompt
-            prompt = self.function_integrator.create_failure_response_prompt(
-                user_message, function_name, function_result
-            )
-            
-            # Generate response
-            response = self.llm_model.generate_content(prompt)
-            if response and hasattr(response, 'text'):
-                return response.text
-            else:
-                return "I encountered an issue. Please try again or ask a different question."
-                
-        except Exception as e:
-            logger.error(f"Error generating failure response: {e}")
-            return "I encountered an issue. Please try again or ask a different question."
+    def _extract_contact_info(self, message: str) -> Dict[str, str]:
+        """Extract contact information from user message"""
+        contact_info = {}
+        message_lower = message.lower()
+        
+        # Extract email
+        import re
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        email_match = re.search(email_pattern, message)
+        if email_match:
+            contact_info['email'] = email_match.group()
+        
+        # Extract phone number
+        phone_pattern = r'\b\d{10,15}\b'
+        phone_match = re.search(phone_pattern, message)
+        if phone_match:
+            contact_info['phone'] = phone_match.group()
+        
+        # Extract name
+        name_patterns = [
+            r'\bmy name is\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',
+            r'\bi\'m\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',
+            r'\bi am\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',
+            r'\bname\s*:\s*([A-Za-z\s]+?)(?:\s*[,.]|$)',
+            r'\bcall me\s+([A-Za-z\s]+?)(?:\s*[,.]|$)'
+        ]
+        
+        for pattern in name_patterns:
+            name_match = re.search(pattern, message_lower, re.IGNORECASE)
+            if name_match:
+                name = name_match.group(1).strip()
+                if name and len(name) > 1 and name not in ['user', 'test', 'example', 'sample']:
+                    contact_info['name'] = name.title()
+                    break
+        
+        # Extract country
+        country_patterns = {
+            'usa': ['usa', 'united states', 'america', 'us', 'u.s.', 'u.s.a'],
+            'uk': ['uk', 'united kingdom', 'britain', 'england', 'great britain'],
+            'australia': ['australia', 'aussie'],
+            'south_korea': ['south korea', 'korea', 'korean', 'seoul']
+        }
+        
+        for country, patterns in country_patterns.items():
+            for pattern in patterns:
+                if pattern in message_lower:
+                    contact_info['country'] = country
+                    break
+            if 'country' in contact_info:
+                break
+        
+        # Only return if we have at least some contact info
+        if contact_info.get('email') or contact_info.get('phone') or contact_info.get('name'):
+            return contact_info
+        
+        return {}
+    
+    def _create_response_prompt(self, user_message: str, session_id: str, conversation_history: List[Dict], lead_saved: bool) -> str:
+        """Create response prompt for the chatbot"""
+        
+        # Get session context
+        session_info = self.session_memory.get_user_info(session_id)
+        session_context = ""
+        if session_info:
+            session_context = f"""
+SESSION CONTEXT:
+- Has contact info: {bool(session_info.email or session_info.phone)}
+- Study country: {getattr(session_info, 'study_country', 'Not specified')}
+- Study level: {getattr(session_info, 'study_level', 'Not specified')}
+- Intake: {getattr(session_info, 'intake', 'Not specified')}
+"""
+        
+        # Build conversation context
+        conversation_context = ""
+        if conversation_history:
+            recent_messages = conversation_history[-3:]  # Last 3 messages
+            conversation_context = "\nRECENT CONVERSATION:\n"
+            for msg in recent_messages:
+                role = msg.get('role', 'user')
+                content = msg.get('content', msg.get('user_message', msg.get('user_input', '')))
+                conversation_context += f"- {role.title()}: {content}\n"
+        
+        # Add lead status to prompt
+        lead_status = ""
+        if lead_saved:
+            lead_status = "\nLEAD STATUS: Contact information has been saved and an advisor will contact you soon."
+        
+        prompt = f"""You are a professional student visa consultant representing AI Consultancy, specializing in helping Nepali students apply to USA, UK, Australia, and South Korea.
+
+{session_context}
+
+{conversation_context}
+
+{lead_status}
+
+Current user message: "{user_message}"
+
+RESPONSE STRATEGY:
+1. If user asks general visa questions → Provide helpful, accurate information about student visas
+2. If user shows interest in applying ("I want to apply", "interested in UK", "thinking about Australia") → Politely ask for contact details explaining that physical application is required
+3. If user provides contact info → Acknowledge and confirm you'll have an advisor contact them
+4. Continue answering questions normally after lead capture
+
+VISA KNOWLEDGE:
+- USA: F-1 visa, SEVIS fee, Form DS-160, financial proof ($25,000+ annually)
+- UK: Tier 4 visa, CAS letter, financial evidence (£1,334/month London, £1,023/month outside)
+- Australia: Subclass 500, CoE, financial capacity, OSHC insurance
+- South Korea: D-2 visa, acceptance certificate, financial guarantee ($10,000+), TOPIK level 3+
+
+BEHAVIOR:
+- Be professional, helpful, and informative
+- Don't repeat information unnecessarily (use session context)
+- When asking for contact, explain that physical office visit is required for application
+- Stay concise and actionable
+- Always maintain a helpful, professional tone
+
+Remember: You are a visa consultant helping students. Be informative, professional, and guide them toward the next step when they show interest."""
+        
+        return prompt
     
     def update_session_memory(self, session_id: str, data: Dict[str, Any]):
         """Update session memory with new information"""

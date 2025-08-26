@@ -1,22 +1,10 @@
 """
-Function Calling Module for AI Chatbot
+Simple Function Module for AI Chatbot
 
-eThis module handles clean, focused function calling for:
-- Vetted content lookup (get_answer)
-- Interest qualification (qualify_interest)
-- Consent management (request_consent)
-- Lead capture (save_lead)
-
-- Human notification (notify_human)
+This module handles basic functionality for the simple chatbot:
+- Session memory management
+- Lead capture integration
+- No complex function calling
 """
 
-from .function_definitions import FUNCTIONS, FUNCTION_METADATA
-from .function_handlers import function_handler
-from .function_integrator import FunctionIntegrator
-
-__all__ = [
-    'FUNCTIONS',
-    'FUNCTION_METADATA',
-    'function_handler', 
-    'FunctionIntegrator'
-]
+__all__ = []
