@@ -187,7 +187,7 @@ def extract_user_info(message: str) -> Dict[str, str]:
 async def lifespan(app: FastAPI):
     """Initialize and cleanup on startup/shutdown"""
     # Startup
-    logger.info("AI Chatbot started with SIMPLE CHATBOT STRUCTURE!")
+    logger.info("AI Chatbot started with SIMPLE CHATBOT STRUCTURE! - FORCE DEPLOYMENT")
     logger.info(f"Application Directory: {CFG.APP_DIR}")
     logger.info(f"Data Directory: {CFG.DATA_DIR}")
     logger.info(f"Index Directory: {CFG.INDEX_DIR}")
