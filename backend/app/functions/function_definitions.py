@@ -6,7 +6,7 @@ Defines the schema for focused, deterministic tools that the LLM can call:
 2. qualify_interest - Lightweight lead intent capture
 3. request_consent - Explicit consent before PII collection
 4. save_lead - Store contact after consent
-5. schedule_callback - Optional immediate booking
+
 6. notify_human - CRM handoff
 """
 
@@ -140,37 +140,10 @@ FUNCTIONS = [
             "required": ["full_name", "consent_text_version", "consent_timestamp"]
         }
     },
-    {
-        "name": "schedule_callback",
-        "description": "Create a callback task for a human advisor. Offer this after saving a lead.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "when_local": {
-                    "type": "string",
-                    "description": "Preferred callback time in ISO-8601 format (local to user if known)"
-                },
-                "timezone": {
-                    "type": "string",
-                    "description": "User's timezone (e.g., Asia/Kathmandu)"
-                },
-                "channel": {
-                    "type": "string",
-                    "enum": ["phone", "whatsapp", "telegram", "email"],
-                    "description": "Preferred contact channel for callback"
-                },
-                "priority": {
-                    "type": "string",
-                    "enum": ["normal", "high"],
-                    "description": "Priority level for the callback"
-                }
-            },
-            "required": ["channel"]
-        }
-    },
+
     {
         "name": "notify_human",
-        "description": "Ping advisors with a concise summary. Call this after save_lead or schedule_callback.",
+        "description": "Ping advisors with a concise summary. Call this after save_lead to notify human advisors.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -216,14 +189,10 @@ FUNCTION_METADATA = {
         "description": "Save contact details after explicit consent",
         "usage": "Only call after request_consent returns true"
     },
-    "schedule_callback": {
-        "priority": "medium",
-        "description": "Optional callback scheduling for immediate human contact",
-        "usage": "Offer after save_lead for better user experience"
-    },
+
     "notify_human": {
         "priority": "medium",
         "description": "Notify human advisors about new leads",
-        "usage": "Call after save_lead or schedule_callback for CRM handoff"
+        "usage": "Call after save_lead for CRM handoff"
     }
 }

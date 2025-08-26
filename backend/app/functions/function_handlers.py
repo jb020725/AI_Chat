@@ -6,7 +6,7 @@ Handles the execution of focused, deterministic tools:
 - qualify_interest: Lightweight lead intent capture
 - request_consent: Explicit consent before PII collection
 - save_lead: Store contact after consent
-- schedule_callback: Optional immediate booking
+
 - notify_human: CRM handoff
 """
 
@@ -264,7 +264,7 @@ class FunctionHandler:
                         "lead_id": lead_id,
                         "full_name": full_name,
                         "contact_saved": True,
-                        "next_step": "Perfect! Your information is saved. Would you like me to schedule a callback with one of our advisors?"
+                        "next_step": "Perfect! Your information is saved. One of our advisors will contact you soon to provide personalized guidance."
                     }
                 }
             else:
@@ -282,48 +282,7 @@ class FunctionHandler:
                 "data": None
             }
     
-    def schedule_callback(self, session_id: str, **kwargs) -> Dict[str, Any]:
-        """Create a callback task for a human advisor"""
-        try:
-            when_local = kwargs.get('when_local', '')
-            timezone = kwargs.get('timezone', 'Asia/Kathmandu')
-            channel = kwargs.get('channel', 'phone')
-            priority = kwargs.get('priority', 'normal')
-            
-            # For now, just log the callback request
-            # In production, integrate with your scheduling system
-            callback_data = {
-                "session_id": session_id,
-                "when_local": when_local,
-                "timezone": timezone,
-                "channel": channel,
-                "priority": priority,
-                "status": "scheduled"
-            }
-            
-            self.logger.info(f"Callback scheduled: {callback_data}")
-            
-            return {
-                "success": True,
-                "message": "Callback scheduled successfully",
-                "data": {
-                    "callback_id": f"cb_{session_id}_{int(datetime.now().timestamp())}",
-                    "when_local": when_local,
-                    "timezone": timezone,
-                    "channel": channel,
-                    "priority": priority,
-                    "message": f"Callback scheduled for {channel}. An advisor will contact you soon!"
-                }
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Error in schedule_callback: {e}")
-            return {
-                "success": False,
-                "message": f"Error scheduling callback: {str(e)}",
-                "data": None
-            }
-    
+
     def notify_human(self, session_id: str, **kwargs) -> Dict[str, Any]:
         """Ping advisors with a concise summary"""
         try:
@@ -374,8 +333,7 @@ class FunctionHandler:
             return self.request_consent(session_id, **kwargs)
         elif function_name == "save_lead":
             return self.save_lead(session_id, **kwargs)
-        elif function_name == "schedule_callback":
-            return self.schedule_callback(session_id, **kwargs)
+
         elif function_name == "notify_human":
             return self.notify_human(session_id, **kwargs)
         else:

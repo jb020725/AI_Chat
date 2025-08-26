@@ -186,7 +186,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Memory System: {'Available' if MEMORY_AVAILABLE else 'Not Available'}")
     logger.info(f"RAG System: Not Used (files kept but not imported)")
     logger.info(f"Gemini AI: {'Available' if GEMINI_AVAILABLE else 'Not Available'}")
-    logger.info(f"Clean Functions: get_answer, qualify_interest, request_consent, save_lead, schedule_callback, notify_human")
+    logger.info(f"Clean Functions: get_answer, qualify_interest, request_consent, save_lead, notify_human")
     logger.info(f"Rate Limiting: 60/minute, 1000/hour per IP")
     logger.info(f"Concurrency Control: Max 20 concurrent LLM calls")
     yield
@@ -226,7 +226,7 @@ async def health_check():
         "rate_limiting": "Active - 60/minute, 1000/hour per IP",
         "concurrency_control": "Active - Max 20 concurrent LLM calls",
         "function_calling_enabled": True,
-        "clean_functions": ["get_answer", "qualify_interest", "request_consent", "save_lead", "schedule_callback", "notify_human"]
+        "clean_functions": ["get_answer", "qualify_interest", "request_consent", "save_lead", "notify_human"]
     }
 
 @app.get("/healthz")
@@ -374,7 +374,7 @@ async def get_system_info():
             "qualify_interest": "Interest capture without PII",
             "request_consent": "Explicit consent management",
             "save_lead": "Contact storage after consent",
-            "schedule_callback": "Human advisor booking",
+    
             "notify_human": "CRM handoff"
         },
         "rate_limiting": {

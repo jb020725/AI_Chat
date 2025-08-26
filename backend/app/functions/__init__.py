@@ -6,7 +6,7 @@ eThis module handles clean, focused function calling for:
 - Interest qualification (qualify_interest)
 - Consent management (request_consent)
 - Lead capture (save_lead)
-- Callback scheduling (schedule_callback)
+
 - Human notification (notify_human)
 """
 
