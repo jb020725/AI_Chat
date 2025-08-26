@@ -271,9 +271,16 @@ async def chat(request: Request, chat_request: ChatRequest):
                 
                 # Use concurrency control for LLM calls
                 async with llm_semaphore:
+                    logger.info(f"🔍 DEBUG: About to call smart_response.generate_smart_response")
+                    logger.info(f"🔍 DEBUG: Message: '{chat_request.message[:100]}...'")
+                    logger.info(f"🔍 DEBUG: Session ID: {session_id}")
+                    logger.info(f"🔍 DEBUG: Conversation history length: {len(conversation_history)}")
+                    
                     result = smart_response.generate_smart_response(
                         chat_request.message, session_id, conversation_history
                     )
+                    
+                    logger.info(f"🔍 DEBUG: smart_response result: {result}")
                 
                 # Extract response from result
                 if result.get('success'):
@@ -298,7 +305,9 @@ async def chat(request: Request, chat_request: ChatRequest):
                     logger.warning(f"Failed to track conversation exchange: {e}")
                     
             except Exception as e:
-                logger.error(f"Error in smart response generation: {e}")
+                logger.error(f"🔍 DEBUG: Error in smart response generation: {e}")
+                import traceback
+                logger.error(f"🔍 DEBUG: Traceback: {traceback.format_exc()}")
                 ai_response = "I'm having technical difficulties. Please try again."
                 
         else:
