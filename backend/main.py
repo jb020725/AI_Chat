@@ -223,7 +223,7 @@ if MEMORY_AVAILABLE:
 
 # Add Telegram router
 if TELEGRAM_AVAILABLE:
-    app.include_router(telegram_router, prefix="/telegram", tags=["telegram"])
+    app.include_router(telegram_router)
 
 @app.get("/health")
 async def health_check():
