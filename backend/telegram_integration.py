@@ -11,10 +11,9 @@ import logging
 import json
 from datetime import datetime
 
-# Import your existing systems
+# Import your existing systems (SAME AS WEB)
 from app.memory.smart_response import get_smart_response
 from app.memory import get_session_memory
-from app.memory.telegram_user_manager import telegram_user_manager
 
 logger = logging.getLogger(__name__)
 
@@ -75,28 +74,10 @@ async def telegram_webhook(request: Request):
         
         logger.info(f"📱 Telegram message from user {user_id}: {text}")
         
-        # Enhanced: Manage Telegram user permanently
-        user_result = telegram_user_manager.create_or_update_user(update_data)
-        if user_result.get('success'):
-            logger.info(f"✅ Telegram user managed: {user_result.get('action')}")
-        
-        # Enhanced: Get comprehensive user context for LLM
-        user_context = telegram_user_manager.get_user_context_for_llm(user_id)
-        logger.info(f"🔍 User context for LLM: {user_context}")
-        
-        # Get conversation history for this user
+        # Get conversation history for this user (SAME AS WEB)
         memory = get_session_memory()
         conversation_context = memory.get_conversation_context(session_id)
         conversation_history = conversation_context.get("conversation_history", [])
-        
-        # Enhanced: Add user context to conversation history for better LLM responses
-        if user_context.get('user_known'):
-            # Add user context as a system message
-            context_message = {
-                "role": "system",
-                "content": f"TELEGRAM USER CONTEXT: {json.dumps(user_context, default=str)}"
-            }
-            conversation_history.append(context_message)
         
         # Process message through your existing smart response system
         result = get_smart_response().generate_smart_response(

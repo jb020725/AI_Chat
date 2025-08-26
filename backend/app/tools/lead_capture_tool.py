@@ -33,6 +33,8 @@ class LeadCreateRequest(BaseModel):
     phone: Optional[str] = None
     target_country: Optional[str] = None
     intake: Optional[str] = None
+    study_level: Optional[str] = None  # ✅ ADDED: study_level field
+    program: Optional[str] = None  # ✅ ADDED: program field
     session_id: Optional[str] = None
     tenant_id: str = "default"
 
@@ -42,6 +44,8 @@ class LeadUpdateRequest(BaseModel):
     phone: Optional[str] = None
     target_country: Optional[str] = None
     intake: Optional[str] = None
+    study_level: Optional[str] = None  # ✅ ADDED: study_level field
+    program: Optional[str] = None  # ✅ ADDED: program field
     session_id: Optional[str] = None
 
 class LeadCaptureTool:
@@ -117,6 +121,8 @@ class LeadCaptureTool:
                 "phone": lead_request.phone,
                 "target_country": lead_request.target_country,
                 "intake": lead_request.intake,
+                "study_level": lead_request.study_level,  # ✅ ADDED: study_level field
+                "program": lead_request.program,  # ✅ ADDED: program field
                 "session_id": lead_request.session_id or f"sess_{int(datetime.now().timestamp())}",
                 "tenant_id": lead_request.tenant_id,
                 "created_at": datetime.now(timezone.utc).isoformat()
