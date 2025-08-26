@@ -58,7 +58,7 @@ export function getBackendUrl(): string {
   if (config.isProduction) {
     // Production: use stable custom service names
     // These URLs will never change unless you manually change the service names
-    return 'https://visa-chatbot-backend-irsvqln4dq-uc.a.run.app';
+    return 'https://ai-chatbot-backend-971031410928.us-central1.run.app';
   } else {
     // Development: use local backend
     return 'http://127.0.0.1:8000';
