@@ -29,6 +29,66 @@ class FunctionHandler:
 
         
             
+    def provide_visa_information(self, session_id: str, **kwargs) -> Dict[str, Any]:
+        """
+        Provide helpful visa information and then politely offer contact option
+        """
+        try:
+            user_query = kwargs.get('user_query', '')
+            target_country = kwargs.get('target_country', '').lower()
+            visa_topic = kwargs.get('visa_topic', 'general')
+            
+            # Get session info to check if we already have contact details
+            session_info = self.session_memory.get_user_info(session_id)
+            has_contact = session_info and (session_info.email or session_info.phone)
+            
+            # Generate helpful visa information based on the query
+            if target_country in ['usa', 'united states', 'america']:
+                country_info = "USA"
+                visa_details = "For USA student visas, you'll need: F-1 visa, SEVIS fee, financial documents, acceptance letter, and proof of ties to Nepal."
+            elif target_country in ['uk', 'united kingdom', 'britain']:
+                country_info = "UK"
+                visa_details = "For UK student visas, you'll need: Student visa (Tier 4), CAS letter, financial evidence, English proficiency, and accommodation details."
+            elif target_country in ['australia']:
+                country_info = "Australia"
+                visa_details = "For Australia student visas, you'll need: Student visa (subclass 500), CoE, financial capacity, English proficiency, and health insurance."
+            elif target_country in ['south korea', 'korea']:
+                country_info = "South Korea"
+                visa_details = "For South Korea student visas, you'll need: D-2 visa, acceptance certificate, financial guarantee, and health certificate."
+            else:
+                country_info = "your chosen country"
+                visa_details = "I can provide specific information about USA, UK, Australia, and South Korea student visas."
+            
+            # Build the response
+            if has_contact:
+                # User already provided contact info - just give information
+                message = f"Here's what you need to know about {country_info} student visas:\n\n{visa_details}\n\nSince I have your contact information, I'll send you detailed requirements and updates. Is there anything specific you'd like to know about the {country_info} visa process?"
+                ask_for_contact = False
+            else:
+                # No contact info yet - provide info and politely offer contact option
+                message = f"Here's what you need to know about {country_info} student visas:\n\n{visa_details}\n\nIf you'd like someone from AI Consultancy to contact you for personalized guidance and detailed requirements, please leave your contact information. Otherwise, I'm here to answer your queries!"
+                ask_for_contact = True
+            
+            return {
+                "success": True,
+                "message": "Visa information provided successfully",
+                "data": {
+                    "country": target_country,
+                    "visa_topic": visa_topic,
+                    "message": message,
+                    "ask_for_contact": ask_for_contact,
+                    "has_contact": has_contact
+                }
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error in provide_visa_information: {e}")
+            return {
+                "success": False,
+                "message": f"Error providing visa information: {str(e)}",
+                "data": None
+            }
+
     def handle_contact_request(self, session_id: str, **kwargs) -> Dict[str, Any]:
         """
         Smart contact request handler - detects both lead opportunities and time-sensitive contact needs

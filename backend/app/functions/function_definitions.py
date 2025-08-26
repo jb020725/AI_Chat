@@ -47,6 +47,28 @@ FUNCTIONS = [
         }
     },
     {
+        "name": "provide_visa_information",
+        "description": "Provide helpful visa information and then politely offer contact option. Use for general visa questions where user wants information but hasn't provided contact details yet.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "user_query": {
+                    "type": "string",
+                    "description": "User's question about visa requirements, process, etc."
+                },
+                "target_country": {
+                    "type": "string",
+                    "description": "Country the user is asking about (USA, UK, Australia, South Korea)"
+                },
+                "visa_topic": {
+                    "type": "string",
+                    "description": "Topic of the visa question (requirements, process, costs, documents, etc.)"
+                }
+            },
+            "required": ["user_query"]
+        }
+    },
+    {
         "name": "define_response_strategy",
         "description": "Define response strategy for complex student visa queries. Student visa topics from Nepal to USA, UK, South Korea, Australia only.",
         "parameters": {

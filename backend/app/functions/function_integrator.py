@@ -250,24 +250,31 @@ Please provide a natural, helpful response to the user based on the function res
 
 Current user message: "{user_message}"
 
-MANDATORY FUNCTION USAGE RULES:
+FUNCTION USAGE GUIDELINES:
 1. If user provides ANY contact info (phone, email, name, country, intake) → CALL detect_and_save_contact_info
 2. If user shows intent to apply or needs guidance → CALL handle_contact_request
-3. NEVER respond without calling a function first
-4. ALWAYS use the appropriate function before responding
+3. For general visa questions (requirements, process, costs) → CALL provide_visa_information
+
+RESPONSE STRATEGY:
+- Be helpful and informative first
+- Answer visa questions with useful information
+- Then politely offer: "If you'd like someone from AI Consultancy to contact you for personalized guidance, please leave your contact information. Otherwise, I'm here to answer your queries!"
+- Don't be pushy about contact info
 
 EXAMPLES:
 - "833999822, USA" → CALL detect_and_save_contact_info
 - "i want to apply for bachelor" → CALL handle_contact_request
+- "what are the requirements for USA student visa?" → CALL provide_visa_information
 - "my name is John" → CALL detect_and_save_contact_info
-- "help me with visa process" → CALL handle_contact_request
+- "i wanna apply for usa" → CALL provide_visa_information (then offer contact option)
 
 Available functions:
 - detect_and_save_contact_info: Extract and save contact information
 - handle_contact_request: Handle inquiries and contact requests
+- provide_visa_information: Provide visa info and offer contact option
 - define_response_strategy: Define response strategy
 
-YOU MUST CALL A FUNCTION. DO NOT GIVE DIRECT RESPONSES."""
+Be helpful first, then offer contact option politely."""
 
         return prompt
     
