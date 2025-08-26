@@ -325,181 +325,152 @@ class SmartResponse:
         return False
     
     def _extract_contact_info(self, message: str) -> Dict[str, str]:
-        """Extract contact information from user message - Enhanced extraction with country/level detection - FIXED PATTERNS AND DEBUG LOGGING - FORCE DEPLOYMENT"""
+        """Extract contact information using AI - Much smarter than regex!"""
         try:
-            print(f"🚀🚀🚀 EXTRACTION FUNCTION CALLED with message: '{message[:100]}...' 🚀🚀🚀")
-            logger.info(f"🚀 EXTRACTION FUNCTION CALLED with message: '{message[:100]}...'")
+            if not self.llm_model:
+                logger.warning("❌ No LLM model available for AI extraction, falling back to basic extraction")
+                return self._extract_contact_info_basic(message)
+            
+            logger.info(f"🤖 AI EXTRACTION STARTED for message: '{message[:100]}...'")
+            
+            # Create AI extraction prompt
+            extraction_prompt = f"""
+            Extract information from this user message: "{message}"
+            
+            Return ONLY a valid JSON object with these exact fields:
+            {{
+                "name": "extracted name or null",
+                "email": "extracted email or null",
+                "phone": "extracted phone or null",
+                "country": "extracted country or null",
+                "study_level": "extracted study level or null",
+                "program": "extracted program or null",
+                "intake": "extracted intake or null"
+            }}
+            
+            Extraction Rules:
+            1. NAME: Look for "my name is", "i am", "i'm", "call me", "this is" patterns
+            2. EMAIL: Find any valid email address format
+            3. PHONE: Find phone numbers (digits, may include +, spaces, dashes, parentheses)
+            4. COUNTRY: Look for USA, UK, Australia, South Korea (or variations)
+            5. STUDY_LEVEL: Look for bachelor, master, masters, phd, diploma, etc.
+            6. PROGRAM: Look for field of study like IT, computer science, engineering, business, etc.
+            7. INTAKE: Look for fall, spring, summer, winter, or month names
+            
+            Examples:
+            - "i am cursor bot" → name: "cursor bot"
+            - "9999999999 is my contact" → phone: "9999999999"
+            - "cursorgdh@gmail.com" → email: "cursorgdh@gmail.com"
+            - "planning to apply for masters" → study_level: "master"
+            - "apply in it sector" → program: "it"
+            - "interested in usa" → country: "usa"
+            
+            Return ONLY the JSON, no other text.
+            """
+            
+            # Use AI to extract information
+            try:
+                response = self.llm_model.generate_content(extraction_prompt)
+                if response and hasattr(response, 'text'):
+                    import json
+                    # Clean the response to get just the JSON
+                    response_text = response.text.strip()
+                    # Remove any markdown formatting
+                    if response_text.startswith('```json'):
+                        response_text = response_text.replace('```json', '').replace('```', '').strip()
+                    elif response_text.startswith('```'):
+                        response_text = response_text.replace('```', '').strip()
+                    
+                    # Parse the JSON response
+                    contact_info = json.loads(response_text)
+                    
+                    # Clean up the extracted data
+                    cleaned_info = {}
+                    for key, value in contact_info.items():
+                        if value and value != "null" and value.lower() != "null":
+                            cleaned_info[key] = value.strip()
+                        else:
+                            cleaned_info[key] = None
+                    
+                    logger.info(f"🤖 AI EXTRACTION SUCCESS: {cleaned_info}")
+                    return cleaned_info
+                    
+                else:
+                    logger.error("❌ AI extraction failed - no response text")
+                    return self._extract_contact_info_basic(message)
+                    
+            except json.JSONDecodeError as e:
+                logger.error(f"❌ AI extraction failed - invalid JSON: {e}")
+                logger.error(f"❌ Raw AI response: {response.text if response else 'No response'}")
+                return self._extract_contact_info_basic(message)
+                
+            except Exception as e:
+                logger.error(f"❌ AI extraction failed: {e}")
+                return self._extract_contact_info_basic(message)
+                
+        except Exception as e:
+            logger.error(f"❌ Error in AI extraction: {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            return self._extract_contact_info_basic(message)
+    
+    def _extract_contact_info_basic(self, message: str) -> Dict[str, str]:
+        """Fallback basic extraction if AI fails"""
+        try:
+            logger.info(f"🔄 Using basic extraction fallback for message: '{message[:100]}...'")
             contact_info = {}
             message_lower = message.lower()
             
-            print(f"🔍🔍🔍 MESSAGE TO PROCESS: '{message_lower}' 🔍🔍🔍")
-            
-            # Extract email - More flexible pattern
+            # Basic email extraction
             import re
             email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
             email_match = re.search(email_pattern, message)
             if email_match:
                 contact_info['email'] = email_match.group()
-                logger.info(f"Extracted email: {contact_info['email']}")
             
-            # Extract phone number - More flexible pattern
-            phone_patterns = [
-                r'\b\d{10,15}\b',  # Basic 10-15 digits
-                r'\+?\d[\d\s().-]{6,}\d',  # International format
-                r'\(\d{3}\)\s*\d{3}-\d{4}',  # US format (123) 456-7890
-            ]
+            # Basic phone extraction
+            phone_pattern = r'\b\d{10,15}\b'
+            phone_match = re.search(phone_pattern, message)
+            if phone_match:
+                contact_info['phone'] = phone_match.group()
             
-            for pattern in phone_patterns:
-                phone_match = re.search(pattern, message)
-                if phone_match:
-                    # Clean the phone number
-                    phone = re.sub(r'[^\d+]', '', phone_match.group())
-                    if len(phone) >= 10:  # Must be at least 10 digits
-                        contact_info['phone'] = phone
-                        logger.info(f"Extracted phone: {contact_info['phone']}")
-                        break
+            # Basic name extraction
+            name_pattern = r'\b(?:my name is|i am|i\'m|call me|this is)\s+([a-zA-Z\s]+?)(?:\s*[,.]|$)'
+            name_match = re.search(name_pattern, message_lower, re.IGNORECASE)
+            if name_match:
+                contact_info['name'] = name_match.group(1).strip().title()
             
-            # Extract name - ONLY when explicitly stated, not random words
-            name_patterns = [
-                r'\bmy name is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s*[,.]|$)',  # "My name is John Smith"
-                r'\bi\'m\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s*[,.]|$)',         # "I'm John Smith"
-                r'\bi am\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s*[,.]|$)',         # "I am John Smith"
-                r'\bname\s*:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s*[,.]|$)',     # "Name: John Smith"
-                r'\bcall me\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s*[,.]|$)',      # "Call me John"
-                r'\bthis is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s*[,.]|$)',      # "This is John"
-                r'\b([A-Z][a-z]+)\s+([A-Z][a-z]+)',              # "John Smith" (First Last format)
-            ]
+            # Basic country extraction
+            if 'usa' in message_lower or 'us' in message_lower:
+                contact_info['country'] = 'usa'
+            elif 'uk' in message_lower:
+                contact_info['country'] = 'uk'
+            elif 'australia' in message_lower:
+                contact_info['country'] = 'australia'
+            elif 'korea' in message_lower:
+                contact_info['country'] = 'south_korea'
             
-            for pattern in name_patterns:
-                name_match = re.search(pattern, message_lower, re.IGNORECASE)
-                if name_match:
-                    if len(name_match.groups()) == 1:
-                        name = name_match.group(1).strip()
-                    else:
-                        # Handle First Last format
-                        name = ' '.join(name_match.groups()).strip()
-                    
-                    # Validate the extracted name
-                    if self._is_valid_name(name):
-                        contact_info['name'] = name.title()
-                        logger.info(f"Extracted valid name: {contact_info['name']}")
-                        break
-                    else:
-                        logger.info(f"Extracted name '{name}' but it's not valid (likely random words)")
+            # Basic study level extraction
+            if 'master' in message_lower:
+                contact_info['study_level'] = 'master'
+            elif 'bachelor' in message_lower:
+                contact_info['study_level'] = 'bachelor'
+            elif 'phd' in message_lower:
+                contact_info['study_level'] = 'phd'
             
-            # Extract country - More flexible patterns
-            country_patterns = {
-                'usa': ['usa', 'united states', 'america', 'us', 'u.s.', 'u.s.a', 'states', 'united states of america'],
-                'uk': ['uk', 'united kingdom', 'britain', 'england', 'great britain', 'british'],
-                'australia': ['australia', 'aussie', 'australian'],
-                'south_korea': ['south korea', 'korea', 'korean', 'seoul', 'republic of korea']
-            }
+            # Basic program extraction
+            if 'it' in message_lower or 'information technology' in message_lower:
+                contact_info['program'] = 'IT'
+            elif 'computer' in message_lower:
+                contact_info['program'] = 'Computer Science'
+            elif 'engineering' in message_lower:
+                contact_info['program'] = 'Engineering'
             
-            logger.info(f"🔍 DEBUG: Checking country patterns in message: '{message_lower}'")
-            for country, patterns in country_patterns.items():
-                for pattern in patterns:
-                    if pattern in message_lower:
-                        contact_info['country'] = country
-                        logger.info(f"✅ MATCHED country '{country}' with pattern '{pattern}'")
-                        break
-                if 'country' in contact_info:
-                    break
-            
-            # Extract study level - More flexible patterns
-            study_level_patterns = {
-                'bachelor': ['bachelor', 'bachelors', 'undergraduate', 'bachelor\'s', 'bachelors degree', 'bachelor degree', 'bachelor\'s degree'],
-                'master': ['master', 'masters', 'graduate', 'master\'s', 'masters degree', 'master degree', 'ms', 'ma', 'mba'],
-                'phd': ['phd', 'doctorate', 'doctoral', 'doctor of philosophy', 'ph.d', 'ph.d.'],
-                'diploma': ['diploma', 'certificate', 'certification']
-            }
-            
-            logger.info(f"🔍 DEBUG: Checking study level patterns in message: '{message_lower}'")
-            print(f"🔍🔍🔍 CHECKING STUDY LEVEL PATTERNS: '{message_lower}' 🔍🔍🔍")
-            for level, patterns in study_level_patterns.items():
-                for pattern in patterns:
-                    if pattern in message_lower:
-                        contact_info['study_level'] = level
-                        print(f"✅✅✅ MATCHED STUDY LEVEL '{level}' with pattern '{pattern}' ✅✅✅")
-                        logger.info(f"✅ MATCHED study level '{level}' with pattern '{pattern}'")
-                        break
-                if 'study_level' in contact_info:
-                    break
-            
-            # Extract program/field of study - SIMPLIFIED and more flexible
-            program_keywords = [
-                'computer science', 'cs', 'it', 'information technology', 'software engineering',
-                'engineering', 'mechanical', 'electrical', 'civil', 'chemical', 'biomedical',
-                'business', 'management', 'mba', 'finance', 'accounting', 'marketing', 'economics',
-                'medicine', 'medical', 'health', 'nursing', 'pharmacy', 'public health',
-                'arts', 'humanities', 'english', 'history', 'philosophy', 'psychology',
-                'science', 'physics', 'chemistry', 'biology', 'mathematics', 'math', 'statistics',
-                'architecture', 'design', 'fashion', 'music', 'film', 'journalism'
-            ]
-            
-            logger.info(f"🔍 DEBUG: Checking program keywords in message: '{message_lower}'")
-            print(f"🔍🔍🔍 CHECKING PROGRAM KEYWORDS: '{message_lower}' 🔍🔍🔍")
-            for keyword in program_keywords:
-                if keyword in message_lower:
-                    contact_info['program'] = keyword.title()
-                    print(f"✅✅✅ MATCHED PROGRAM '{keyword}' ✅✅✅")
-                    logger.info(f"✅ MATCHED program '{keyword}'")
-                    break
-            
-            # If no program found with keywords, try to extract from context
-            if 'program' not in contact_info:
-                logger.info(f"🔍 DEBUG: No direct keyword match, trying context patterns...")
-                # Look for "study X" or "interested in X" patterns
-                study_patterns = [
-                    r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+([a-zA-Z\s]+?)(?:\s+in|\s+for|\s*$|\.|,)',
-                    r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+([a-zA-Z\s]+?)(?:\s+degree|\s+program|\s+course)',
-                ]
-                
-                for pattern in study_patterns:
-                    program_match = re.search(pattern, message_lower, re.IGNORECASE)
-                    if program_match:
-                        program = program_match.group(1).strip()
-                        # Clean up the program name
-                        program = re.sub(r'\b(?:degree|program|course|in|for)\b', '', program).strip()
-                        if program and len(program) > 2 and program not in ['a', 'an', 'the', 'my', 'your']:
-                            contact_info['program'] = program.title()
-                            logger.info(f"✅ MATCHED program from context: '{program}' with pattern '{pattern}'")
-                            break
-            
-            # Extract intake period
-            intake_patterns = {
-                'fall': ['fall', 'autumn', 'september', 'october', 'november'],
-                'spring': ['spring', 'march', 'april', 'may'],
-                'summer': ['summer', 'june', 'july', 'august'],
-                'winter': ['winter', 'december', 'january', 'february']
-            }
-            
-            logger.info(f"🔍 DEBUG: Checking intake patterns in message: '{message_lower}'")
-            for intake, patterns in intake_patterns.items():
-                for pattern in patterns:
-                    if pattern in message_lower:
-                        contact_info['intake'] = intake.title()
-                        logger.info(f"✅ MATCHED intake '{intake}' with pattern '{pattern}'")
-                        break
-                if 'intake' in contact_info:
-                    break
-            
-            # Log what we found
-            if contact_info:
-                logger.info(f"🔍 FINAL CONTACT INFO EXTRACTED: {contact_info}")
-                logger.info(f"🔍 Country detected: {contact_info.get('country', 'NOT FOUND')}")
-                logger.info(f"🔍 Study level detected: {contact_info.get('study_level', 'NOT FOUND')}")
-                logger.info(f"🔍 Program detected: {contact_info.get('program', 'NOT FOUND')}")
-                logger.info(f"🔍 Intake detected: {contact_info.get('intake', 'NOT FOUND')}")
-            else:
-                logger.info("❌ No valid contact info found in message")
-            
-            # Return ALL extracted info, not just when there's email/phone
-            # This allows us to capture study level, program, country even without contact details
+            logger.info(f"🔄 Basic extraction result: {contact_info}")
             return contact_info
+            
         except Exception as e:
-            logger.error(f"❌ Error in _extract_contact_info: {e}")
-            import traceback
-            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            logger.error(f"❌ Error in basic extraction: {e}")
             return {}
     
     def _create_response_prompt(self, user_message: str, session_id: str, conversation_history: List[Dict], lead_saved: bool) -> str:
