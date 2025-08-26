@@ -429,6 +429,20 @@ async def get_countries():
         "count": 4
     }
 
+@app.get("/api/version")
+async def get_version():
+    """Get current version and deployment info"""
+    return {
+        "version": "ENHANCED EXTRACTION VERSION 2.0",
+        "deployment_time": datetime.now().isoformat(),
+        "features": {
+            "enhanced_extraction": "ENABLED",
+            "debug_logging": "ENABLED",
+            "study_level_detection": "FIXED",
+            "program_detection": "FIXED"
+        }
+    }
+
 @app.get("/api/status")
 async def get_status():
     """Get system status"""
@@ -472,6 +486,7 @@ else:
 
 if __name__ == "__main__":
     # Run the FastAPI app
+    logger.info("AI Chatbot started with ENHANCED EXTRACTION VERSION 2.0! - FORCE DEPLOYMENT")
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
