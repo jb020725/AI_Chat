@@ -49,7 +49,7 @@ jobs:
     
     - name: Deploy Backend to Cloud Run
       run: |
-        gcloud run deploy visa-chatbot-backend \
+        gcloud run deploy ai-chatbot-backend \
           --source ./backend \
           --platform managed \
           --region us-central1 \
@@ -97,7 +97,7 @@ jobs:
     
     - name: Deploy Frontend to Cloud Run
       run: |
-        gcloud run deploy visa-chatbot-frontend \
+        gcloud run deploy ai-chatbot-frontend \
           --source ./frontend \
           --platform managed \
           --region us-central1 \
