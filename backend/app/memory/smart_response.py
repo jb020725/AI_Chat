@@ -64,6 +64,9 @@ class SmartResponse:
             # First, check if we need to save a lead
             lead_saved = self._detect_and_save_lead(user_message, session_id)
             
+            # Extract contact info for session memory update
+            contact_info = self._extract_contact_info(user_message)
+            
             # Create response prompt
             prompt = self._create_response_prompt(user_message, session_id, conversation_history, lead_saved)
             
@@ -78,7 +81,8 @@ class SmartResponse:
                 return {
                     "response": ai_response,
                     "success": True,
-                    "function_calls": []
+                    "function_calls": [],
+                    "user_info_extracted": contact_info  # Return extracted info for session memory
                 }
                 
             except Exception as e:

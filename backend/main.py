@@ -256,17 +256,7 @@ async def chat(request: Request, chat_request: ChatRequest):
         # Use provided session ID or generate new one
         session_id = chat_request.session_id or f"session_{datetime.now().timestamp()}"
         
-        # Extract user information for THIS TURN (legacy support)
-        turn_info = extract_user_info(chat_request.message)
-        
-        # Update session memory with extracted info
-        if MEMORY_AVAILABLE and turn_info:
-            memory = get_session_memory()
-            if turn_info:
-                memory.update_session(session_id, turn_info)
-                logger.info(f"Session updated with turn info: {turn_info}")
-        
-        # Generate smart response using simple chatbot
+        # Generate smart response using simple chatbot (this handles extraction)
         if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
             try:
                 # Set the LLM model in the smart response system
@@ -289,6 +279,11 @@ async def chat(request: Request, chat_request: ChatRequest):
                 if result.get('success'):
                     ai_response = result.get('response', '')
                     logger.info("Simple chatbot response generated successfully")
+                    
+                    # Update session memory with extracted info from smart_response
+                    if result.get('user_info_extracted'):
+                        memory.update_session(session_id, result.get('user_info_extracted'))
+                        logger.info(f"Session updated with enhanced extraction: {result.get('user_info_extracted')}")
                     
                 else:
                     # Fallback response if chatbot fails
@@ -313,7 +308,7 @@ async def chat(request: Request, chat_request: ChatRequest):
         return ChatResponse(
             response=ai_response,
             session_id=session_id,
-            user_info_extracted=turn_info,
+            user_info_extracted={},  # Will be populated by smart_response
             timestamp=datetime.now().isoformat()
         )
         
