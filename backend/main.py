@@ -37,6 +37,14 @@ from app.utils.paths import CFG
 from app.utils.logging_config import setup_clean_logging
 from app.config import settings
 
+# Import Telegram integration
+try:
+    from telegram_integration import telegram_router
+    TELEGRAM_AVAILABLE = True
+except ImportError as e:
+    print(f"Telegram integration not available: {e}")
+    TELEGRAM_AVAILABLE = False
+
 # RAG components have been completely removed
 RAG_AVAILABLE = False
 RAG_ENABLED = False
@@ -211,6 +219,10 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Add memory router
 if MEMORY_AVAILABLE:
     app.include_router(memory_router, prefix="/memory", tags=["memory"])
+
+# Add Telegram router
+if TELEGRAM_AVAILABLE:
+    app.include_router(telegram_router, prefix="/telegram", tags=["telegram"])
 
 @app.get("/health")
 async def health_check():

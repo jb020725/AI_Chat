@@ -98,7 +98,7 @@ class SmartResponse:
             }
     
     def _detect_and_save_lead(self, user_message: str, session_id: str) -> bool:
-        """Detect if user provided contact info and save lead"""
+        """Detect if user provided contact info and save/update lead - ONE PER CONVERSATION"""
         try:
             logger.info(f"🔍 Lead detection started for message: '{user_message[:100]}...'")
             
@@ -107,14 +107,104 @@ class SmartResponse:
             
             logger.info(f"🔍 Contact info extracted: {contact_info}")
             
-            if not contact_info:
-                logger.info("🔍 No contact info found, skipping lead creation")
+            # Only proceed if we have REAL contact information (email or phone)
+            if not contact_info.get('email') and not contact_info.get('phone'):
+                logger.info("🔍 No real contact info (email/phone) found, skipping lead creation")
                 return False
             
             # Get session info for additional details
             session_info = self.session_memory.get_user_info(session_id)
             logger.info(f"🔍 Session info: {session_info}")
             
+            # Check if lead already exists for this session
+            existing_lead = self._get_existing_lead(session_id)
+            
+            if existing_lead:
+                logger.info(f"🔍 Updating existing lead for session {session_id}")
+                # Update existing lead with new information
+                return self._update_existing_lead(existing_lead, contact_info, session_info)
+            else:
+                logger.info(f"🔍 Creating new lead for session {session_id}")
+                # Create new lead
+                return self._create_new_lead(contact_info, session_info, session_id)
+                
+        except Exception as e:
+            logger.error(f"❌ Error in lead detection and saving: {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            return False
+    
+    def _get_existing_lead(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Check if a lead already exists for this session"""
+        try:
+            result = self.lead_capture_tool.get_leads_by_session(session_id)
+            if result.get('success') and result.get('data'):
+                # Return the first (and should be only) lead for this session
+                return result['data'][0]
+            return None
+        except Exception as e:
+            logger.error(f"Error checking existing lead: {e}")
+            return None
+    
+    def _update_existing_lead(self, existing_lead: Dict[str, Any], contact_info: Dict[str, str], session_info: Any) -> bool:
+        """Update existing lead with new information"""
+        try:
+            # Prepare update data - only update if we have better information
+            update_data = {}
+            
+            # Only update name if we have a better one (not random words)
+            if contact_info.get('name') and self._is_valid_name(contact_info['name']):
+                if not existing_lead.get('name') or self._is_better_name(contact_info['name'], existing_lead['name']):
+                    update_data['name'] = contact_info['name']
+            
+            # Update email if we have a real one
+            if contact_info.get('email') and '@' in contact_info['email']:
+                if not existing_lead.get('email') or existing_lead['email'].startswith('no-email-'):
+                    update_data['email'] = contact_info['email']
+            
+            # Update phone if we have a real one
+            if contact_info.get('phone') and len(contact_info['phone']) >= 10:
+                if not existing_lead.get('phone') or existing_lead['phone'] == 'EMPTY':
+                    update_data['phone'] = contact_info['phone']
+            
+            # Update country if we have one
+            if contact_info.get('country'):
+                if not existing_lead.get('target_country') or existing_lead['target_country'] == 'EMPTY':
+                    update_data['target_country'] = contact_info['country']
+            
+            # Update other fields from session info
+            if session_info:
+                if not existing_lead.get('intake') and getattr(session_info, 'intake', ''):
+                    update_data['intake'] = session_info.intake
+                if not existing_lead.get('study_level') and getattr(session_info, 'study_level', ''):
+                    update_data['study_level'] = session_info.study_level
+            
+            if not update_data:
+                logger.info("🔍 No new information to update in existing lead")
+                return True  # Success - no update needed
+            
+            # Add timestamp
+            update_data['updated_at'] = datetime.now().isoformat()
+            
+            logger.info(f"🔍 Updating lead with: {update_data}")
+            
+            # Update the lead
+            result = self.lead_capture_tool.update_lead(existing_lead['id'], update_data)
+            
+            if result.get('success'):
+                logger.info(f"✅ Lead updated successfully: {update_data}")
+                return True
+            else:
+                logger.error(f"❌ Failed to update lead: {result.get('error')}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Error updating lead: {e}")
+            return False
+    
+    def _create_new_lead(self, contact_info: Dict[str, str], session_info: Any, session_id: str) -> bool:
+        """Create a new lead - only when we have real contact info"""
+        try:
             # Prepare lead data
             lead_data = {
                 "session_id": session_id,
@@ -128,29 +218,65 @@ class SmartResponse:
                 "created_at": datetime.now().isoformat()
             }
             
-            logger.info(f"🔍 Lead data prepared: {lead_data}")
+            logger.info(f"🔍 Creating new lead: {lead_data}")
             
             # Save to database
-            logger.info("🔍 Attempting to save lead to database...")
             result = self.lead_capture_tool.create_lead(lead_data)
             
-            logger.info(f"🔍 Lead creation result: {result}")
-            
             if result.get('success'):
-                logger.info(f"✅ Lead saved successfully: {lead_data}")
+                logger.info(f"✅ New lead created successfully: {lead_data}")
                 return True
             else:
-                logger.error(f"❌ Failed to save lead: {result.get('error')}")
+                logger.error(f"❌ Failed to create new lead: {result.get('error')}")
                 return False
                 
         except Exception as e:
-            logger.error(f"❌ Error in lead detection and saving: {e}")
-            import traceback
-            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            logger.error(f"❌ Error creating new lead: {e}")
             return False
     
+    def _is_valid_name(self, name: str) -> bool:
+        """Check if a name is valid (not random words)"""
+        if not name or len(name) < 2:
+            return False
+        
+        # List of common words that are NOT names
+        invalid_words = [
+            'can', 'you', 'would', 'like', 'which', 'visas', 'need', 'ielts', 'okay', 'whats',
+            'information', 'my', 'name', 'are', 'thank', 'the', 'and', 'or', 'but', 'in', 'on',
+            'at', 'to', 'for', 'of', 'with', 'by', 'from', 'up', 'down', 'out', 'off', 'over',
+            'under', 'above', 'below', 'between', 'among', 'through', 'during', 'before', 'after',
+            'while', 'when', 'where', 'why', 'how', 'what', 'who', 'whom', 'whose', 'this', 'that',
+            'these', 'those', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
+            'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'shall'
+        ]
+        
+        name_lower = name.lower().strip()
+        
+        # Check if name contains only invalid words
+        words = name_lower.split()
+        valid_words = [word for word in words if word not in invalid_words and len(word) > 1]
+        
+        # Name is valid if it has at least one valid word
+        return len(valid_words) > 0
+    
+    def _is_better_name(self, new_name: str, existing_name: str) -> bool:
+        """Check if new name is better than existing name"""
+        if not existing_name:
+            return True
+        
+        # Prefer longer names (more complete)
+        if len(new_name) > len(existing_name):
+            return True
+        
+        # Prefer names that don't start with common question words
+        question_words = ['can', 'would', 'which', 'what', 'how', 'when', 'where', 'why']
+        if new_name.lower().split()[0] not in question_words and existing_name.lower().split()[0] in question_words:
+            return True
+        
+        return False
+    
     def _extract_contact_info(self, message: str) -> Dict[str, str]:
-        """Extract contact information from user message"""
+        """Extract contact information from user message - Improved accuracy"""
         contact_info = {}
         message_lower = message.lower()
         
@@ -179,15 +305,15 @@ class SmartResponse:
                     logger.info(f"Extracted phone: {contact_info['phone']}")
                     break
         
-        # Extract name - More flexible patterns
+        # Extract name - ONLY when explicitly stated, not random words
         name_patterns = [
-            r'\bmy name is\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',
-            r'\bi\'m\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',
-            r'\bi am\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',
-            r'\bname\s*:\s*([A-Za-z\s]+?)(?:\s*[,.]|$)',
-            r'\bcall me\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',
-            r'\bthis is\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',
-            r'\b([A-Z][a-z]+)\s+([A-Z][a-z]+)',  # First Last format
+            r'\bmy name is\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',  # "My name is John Smith"
+            r'\bi\'m\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',         # "I'm John Smith"
+            r'\bi am\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',         # "I am John Smith"
+            r'\bname\s*:\s*([A-Za-z\s]+?)(?:\s*[,.]|$)',     # "Name: John Smith"
+            r'\bcall me\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',      # "Call me John"
+            r'\bthis is\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',      # "This is John"
+            r'\b([A-Z][a-z]+)\s+([A-Z][a-z]+)',              # "John Smith" (First Last format)
         ]
         
         for pattern in name_patterns:
@@ -199,10 +325,13 @@ class SmartResponse:
                     # Handle First Last format
                     name = ' '.join(name_match.groups()).strip()
                 
-                if name and len(name) > 1 and name.lower() not in ['user', 'test', 'example', 'sample', 'john', 'jane']:
+                # Validate the extracted name
+                if self._is_valid_name(name):
                     contact_info['name'] = name.title()
-                    logger.info(f"Extracted name: {contact_info['name']}")
+                    logger.info(f"Extracted valid name: {contact_info['name']}")
                     break
+                else:
+                    logger.info(f"Extracted name '{name}' but it's not valid (likely random words)")
         
         # Extract country - More flexible patterns
         country_patterns = {
@@ -225,10 +354,10 @@ class SmartResponse:
         if contact_info:
             logger.info(f"Contact info extracted: {contact_info}")
         else:
-            logger.info("No contact info found in message")
+            logger.info("No valid contact info found in message")
         
-        # Only return if we have at least some contact info
-        if contact_info.get('email') or contact_info.get('phone') or contact_info.get('name'):
+        # Only return if we have at least email OR phone (name alone is not enough)
+        if contact_info.get('email') or contact_info.get('phone'):
             return contact_info
         
         return {}
