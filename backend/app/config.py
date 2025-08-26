@@ -3,9 +3,13 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 
-# Environment variables are set in Cloud Run deployment
-# No local file loading needed for production
-print("Loading environment variables from Cloud Run configuration")
+# Try to load local environment file for development
+env_file = Path(__file__).parent.parent / ".env"
+if env_file.exists():
+    load_dotenv(env_file)
+    print("Loaded local environment file for development")
+else:
+    print("Loading environment variables from Cloud Run configuration")
 
 class Settings:
 	# API Configuration

@@ -18,22 +18,13 @@ FUNCTIONS = [
                     "type": "string",
                     "description": "User's current question or statement to analyze"
                 },
-                "conversation_context": {
-                    "type": "object",
-                    "description": "Current conversation context and user's expressed interests"
-                },
-                "detected_interests": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "List of detected interests (country, program, intake, etc.)"
-                },
-                                        "urgency_level": {
-                            "type": "string",
-                            "description": "Detected urgency level (normal, time-sensitive, high, important)",
-                            "enum": ["normal", "time-sensitive", "high", "important"]
-                        }
+                "urgency_level": {
+                    "type": "string",
+                    "description": "Detected urgency level (normal, time-sensitive, high, important)",
+                    "enum": ["normal", "time-sensitive", "high", "important"]
+                }
             },
-            "required": ["user_query", "conversation_context"]
+            "required": ["user_query"]
         }
     },
     {
@@ -46,17 +37,13 @@ FUNCTIONS = [
                     "type": "string",
                     "description": "User's current message to analyze for contact information"
                 },
-                "conversation_context": {
-                    "type": "object",
-                    "description": "Current conversation context and previously saved information"
-                },
                 "extraction_mode": {
                     "type": "string",
                     "description": "Mode of contact info extraction",
                     "enum": ["auto_detect", "update_existing", "initial_contact"]
                 }
             },
-            "required": ["user_query", "conversation_context"]
+            "required": ["user_query"]
         }
     },
     {
