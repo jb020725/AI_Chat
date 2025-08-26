@@ -172,12 +172,24 @@ class SmartResponse:
                 if not existing_lead.get('target_country') or existing_lead['target_country'] == 'EMPTY':
                     update_data['target_country'] = contact_info['country']
             
-            # Update other fields from session info
-            if session_info:
-                if not existing_lead.get('intake') and getattr(session_info, 'intake', ''):
-                    update_data['intake'] = session_info.intake
-                if not existing_lead.get('study_level') and getattr(session_info, 'study_level', ''):
-                    update_data['study_level'] = session_info.study_level
+            # Update other fields from contact info or session info
+            if contact_info.get('intake'):
+                if not existing_lead.get('intake') or existing_lead['intake'] == '':
+                    update_data['intake'] = contact_info['intake']
+            elif session_info and not existing_lead.get('intake') and getattr(session_info, 'intake', ''):
+                update_data['intake'] = session_info.intake
+                
+            if contact_info.get('study_level'):
+                if not existing_lead.get('study_level') or existing_lead['study_level'] == '':
+                    update_data['study_level'] = contact_info['study_level']
+            elif session_info and not existing_lead.get('study_level') and getattr(session_info, 'study_level', ''):
+                update_data['study_level'] = session_info.study_level
+                
+            if contact_info.get('program'):
+                if not existing_lead.get('program') or existing_lead['program'] == '':
+                    update_data['program'] = contact_info['program']
+            elif session_info and not existing_lead.get('program') and getattr(session_info, 'program', ''):
+                update_data['program'] = session_info.program
             
             if not update_data:
                 logger.info("🔍 No new information to update in existing lead")
@@ -212,8 +224,9 @@ class SmartResponse:
                 "phone": contact_info.get('phone', ''),
                 "email": contact_info.get('email', ''),
                 "target_country": contact_info.get('country', ''),
-                "intake": getattr(session_info, 'intake', '') if session_info else '',
-                "study_level": getattr(session_info, 'study_level', '') if session_info else '',
+                "intake": contact_info.get('intake', '') or getattr(session_info, 'intake', '') if session_info else '',
+                "study_level": contact_info.get('study_level', '') or getattr(session_info, 'study_level', '') if session_info else '',
+                "program": contact_info.get('program', '') or getattr(session_info, 'program', '') if session_info else '',
                 "status": "new_lead",
                 "created_at": datetime.now().isoformat()
             }
@@ -348,6 +361,67 @@ class SmartResponse:
                     logger.info(f"Extracted country: {contact_info['country']}")
                     break
             if 'country' in contact_info:
+                break
+        
+        # Extract study level - More flexible patterns
+        study_level_patterns = {
+            'bachelor': ['bachelor', 'bachelors', 'undergraduate', 'bachelor\'s', 'bachelors degree', 'bachelor degree'],
+            'master': ['master', 'masters', 'graduate', 'master\'s', 'masters degree', 'master degree', 'ms', 'ma'],
+            'phd': ['phd', 'doctorate', 'doctoral', 'doctor of philosophy', 'ph.d'],
+            'diploma': ['diploma', 'certificate', 'certification']
+        }
+        
+        for level, patterns in study_level_patterns.items():
+            for pattern in patterns:
+                if pattern in message_lower:
+                    contact_info['study_level'] = level
+                    logger.info(f"Extracted study level: {contact_info['study_level']}")
+                    break
+            if 'study_level' in contact_info:
+                break
+        
+        # Extract program/field of study
+        program_patterns = [
+            r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+(?:computer science|cs|it|information technology)\b',
+            r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+(?:engineering|mechanical|electrical|civil|chemical)\b',
+            r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+(?:business|management|mba|finance|accounting|marketing)\b',
+            r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+(?:medicine|medical|health|nursing|pharmacy)\b',
+            r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+(?:arts|humanities|english|history|philosophy)\b',
+            r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+(?:science|physics|chemistry|biology|mathematics|math)\b',
+            r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\s+(\w+(?:\s+\w+)*)\b'
+        ]
+        
+        for pattern in program_patterns:
+            program_match = re.search(pattern, message_lower, re.IGNORECASE)
+            if program_match:
+                if len(program_match.groups()) > 0:
+                    program = program_match.group(1).strip()
+                else:
+                    # Extract from the full match
+                    full_match = program_match.group(0)
+                    # Remove common words and extract the actual program
+                    program = re.sub(r'\b(?:study|studying|pursue|pursuing|interested in|want to study)\b', '', full_match).strip()
+                
+                if program and len(program) > 2:
+                    contact_info['program'] = program.title()
+                    logger.info(f"Extracted program: {contact_info['program']}")
+                    break
+        
+        # Extract intake period
+        intake_patterns = {
+            'fall': ['fall', 'autumn', 'september', 'october', 'november'],
+            'spring': ['spring', 'march', 'april', 'may'],
+            'summer': ['summer', 'june', 'july', 'august'],
+            'winter': ['winter', 'december', 'january', 'february']
+        }
+        
+        for intake, patterns in intake_patterns.items():
+            for pattern in patterns:
+                if pattern in message_lower:
+                    contact_info['intake'] = intake.title()
+                    logger.info(f"Extracted intake: {contact_info['intake']}")
+                    break
+            if 'intake' in contact_info:
                 break
         
         # Log what we found
