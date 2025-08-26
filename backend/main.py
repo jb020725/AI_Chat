@@ -41,8 +41,9 @@ from app.config import settings
 try:
     from telegram_integration import telegram_router
     TELEGRAM_AVAILABLE = True
+    print("✅ Telegram integration loaded successfully")
 except ImportError as e:
-    print(f"Telegram integration not available: {e}")
+    print(f"❌ Telegram integration not available: {e}")
     TELEGRAM_AVAILABLE = False
 
 # RAG components have been completely removed
