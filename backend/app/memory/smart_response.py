@@ -1,295 +1,212 @@
-#!/usr/bin/env python3
 """
-Smart Response Generator
-Integrates RAG results with session memory for intelligent responses
+Smart Response System for Clean Function-Calling Structure
+
+Manages intelligent response generation and memory integration:
+- Function calling integration
+- Session memory management
+- Natural response generation
+- No RAG integration (disabled)
 """
 
 import logging
-from typing import Dict, List, Optional, Any
-from .session_memory import get_session_memory
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+from app.memory.session_memory import get_session_memory
 
 logger = logging.getLogger(__name__)
 
-class SmartResponseGenerator:
-    """Generates intelligent responses with smart question integration"""
+class SmartResponse:
+    """Manages smart response generation and memory integration"""
     
     def __init__(self):
-        self.memory = get_session_memory()
-        self.rag_llm_integrator = None
-        logger.info("Smart Response Generator initialized")
-    
+        self.logger = logging.getLogger(__name__)
+        self.session_memory = get_session_memory()
+        self.function_integrator = None
+        self.llm_model = None
+        
     def set_llm_model(self, llm_model):
         """Set the LLM model for function calling only (RAG disabled)"""
         try:
+            self.llm_model = llm_model
+            # Import here to avoid circular imports
             from app.functions.function_integrator import FunctionIntegrator
             self.function_integrator = FunctionIntegrator(llm_model)
-            logger.info(f"LLM model set for function calling only. Function Integrator: {self.function_integrator is not None}")
+            logger.info(f"LLM model set for function calling. Integrator: {self.function_integrator is not None}")
         except Exception as e:
-            logger.error(f"Failed to set LLM model: {e}")
+            logger.error(f"Failed to set LLM model for function calling: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             self.function_integrator = None
     
-    def generate_response(self, 
-                         user_message: str, 
-                         rag_context: str, 
-                         session_id: str,
-                         conversation_history: List[Dict[str, str]] = None) -> str:
-        """
-        Generate smart response with LLM-first approach and smart functions
-        
-        Args:
-            user_message: User's current message
-            rag_context: RAG search results (legacy parameter, kept for compatibility)
-            session_id: Current session ID
-            conversation_history: Previous conversation messages
-            
-        Returns:
-            str: Smart LLM response with intelligent functions
-        """
+    def generate_smart_response(self, user_message: str, session_id: str, conversation_history: List[Dict]) -> Dict[str, Any]:
+        """Generate intelligent response using function calling and memory"""
         try:
-            # Get current session info
-            session_info = self.memory.get_user_info(session_id)
+            if not self.function_integrator:
+                return {
+                    "response": "I'm having technical difficulties. Please try again.",
+                    "success": False,
+                    "error": "Function integrator not available"
+                }
             
-            # NEW APPROACH: Function Calling Only - No RAG
-            logger.info("🔄 Function calling approach: No RAG context")
+            # Create function calling prompt
+            prompt = self.function_integrator.create_function_calling_prompt(
+                user_message, session_id, conversation_history
+            )
             
-            # Import domain checker
-            from app.utils.domain_checker import is_in_domain
-            
-            # Debug: Check if function integrator is available
-            logger.info(f"Function integrator available: {self.function_integrator is not None}")
-            logger.info(f"User message: {user_message}")
-            logger.info(f"Session info: {session_info.__dict__ if hasattr(session_info, '__dict__') else session_info}")
-            
-            # Check domain
-            domain_check = is_in_domain(user_message)
-            logger.info(f"Domain check result: {domain_check}")
-            
-            # Option 1: In domain - use function calling
-            if domain_check.get('in_domain', False):
-                logger.info("✅ In domain - using function calling")
+            # Call LLM with function calling
+            try:
+                response = self.llm_model.generate_content(
+                    prompt,
+                    tools=[{"function_declarations": self.function_integrator.get_function_declarations()}]
+                )
                 
-                # Use function calling for enhanced responses
-                if self.function_integrator:
-                    try:
-                        result = self.function_integrator.process_with_functions(
-                            user_message=user_message,
-                            session_id=session_id,
-                            conversation_history=conversation_history,
-                            session_info=session_info.__dict__ if hasattr(session_info, '__dict__') else session_info
-                        )
-                        
-                        if result.get('processing_successful') and result.get('llm_response'):
-                            return result.get('llm_response')
-                        else:
-                            # Fallback to basic domain response
-                            return self._handle_domain_query_with_functions(
-                                user_message, session_id, conversation_history, session_info
-                            )
-                    except Exception as e:
-                        logger.error(f"Function calling failed: {e}")
-                        # Fallback to basic domain response
-                        return self._handle_domain_query_with_functions(
-                            user_message, session_id, conversation_history, session_info
-                        )
-                else:
-                    # No function integrator - use basic response
-                    return self._handle_domain_query_with_functions(
-                        user_message, session_id, conversation_history, session_info
-                    )
-            
-            # Option 2: Out of domain - redirect
-            else:
-                logger.info("❌ Out of domain - redirecting")
-                return self._generate_out_of_domain_response(domain_check)
-            
-        except Exception as e:
-            logger.error(f"Error in smart response generation: {e}")
-            return "I'm having technical difficulties. Please try again."
-
-    def _generate_simple_rag_response(self, user_message: str, rag_context: List[Dict]) -> str:
-        """Generate simple response when RAG has results but LLM integration fails"""
-        try:
-            # Use the first RAG result to generate a simple response
-            if isinstance(rag_context, list) and len(rag_context) > 0:
-                first_result = rag_context[0]
-                content = first_result.get('content', '')
-                title = first_result.get('title', '')
+                # Process function calls if any
+                result = self._process_function_response(response, user_message, session_id, conversation_history)
+                return result
                 
-                # Extract the most relevant information and keep it concise
-                if len(content) > 100:
-                    # Take the first sentence or first 100 characters
-                    sentences = content.split('.')
-                    if sentences and sentences[0]:
-                        summary = sentences[0].strip()
-                        if len(summary) > 100:
-                            summary = summary[:100] + "..."
-                    else:
-                        summary = content[:100] + "..."
-                else:
-                    summary = content
+            except Exception as e:
+                logger.error(f"Error calling LLM with functions: {e}")
+                # Fallback to basic response
+                return {
+                    "response": "I'm experiencing technical difficulties. Please try again or ask a different question.",
+                    "success": False,
+                    "error": str(e)
+                }
                 
-                return f"Based on the information I have: {summary} For more details, just ask!"
-            else:
-                return "I have some information about that. Please contact our team for detailed guidance."
         except Exception as e:
-            logger.error(f"Error generating simple RAG response: {e}")
-            return "I have information about that topic. Please contact our team for assistance."
-
-    def _handle_domain_query_with_functions(self, user_message: str, session_id: str, 
-                                          conversation_history: List[Dict], session_info: Any) -> str:
-        """Handle domain queries using function calling only"""
+            logger.error(f"Error in generate_smart_response: {e}")
+            return {
+                "response": "I encountered an error. Please try again.",
+                "success": False,
+                "error": str(e)
+            }
+    
+    def _process_function_response(self, response, user_message: str, session_id: str, conversation_history: List[Dict]) -> Dict[str, Any]:
+        """Process LLM response and execute function calls"""
         try:
-            logger.info("Handling domain query with function calling")
+            # Initialize result
+            result = {
+                "response": "",
+                "function_calls": [],
+                "success": True
+            }
             
-            # Try to use function integrator if available
-            if self.function_integrator:
-                try:
-                    result = self.function_integrator.process_with_functions(
-                        user_message=user_message,
-                        session_id=session_id,
-                        conversation_history=conversation_history,
-                        session_info=session_info.__dict__ if hasattr(session_info, '__dict__') else session_info
-                    )
-                    
-                    if result.get('processing_successful') and result.get('llm_response'):
-                        return result.get('llm_response')
-                    
-                except Exception as e:
-                    logger.error(f"Function calling failed: {e}")
+            # Check for function calls
+            if hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
+                if hasattr(candidate, 'content') and candidate.content:
+                    for part in candidate.content.parts:
+                        if hasattr(part, 'function_call') and part.function_call:
+                            # Execute function call
+                            function_call = part.function_call
+                            function_name = getattr(function_call, 'name', '')
+                            function_args = getattr(function_call, 'args', {})
+                            
+                            if function_name:
+                                logger.info(f"Executing function: {function_name} with args: {function_args}")
+                                
+                                # Execute the function
+                                function_result = self.function_integrator.execute_function_call(
+                                    function_name, session_id, **function_args
+                                )
+                                
+                                # Add to results
+                                result["function_calls"].append({
+                                    "function_name": function_name,
+                                    "arguments": function_args,
+                                    "result": function_result
+                                })
+                                
+                                # Generate natural response
+                                if function_result.get('success'):
+                                    natural_response = self._generate_natural_response(
+                                        user_message, function_name, function_result, conversation_history
+                                    )
+                                    result["response"] = natural_response
+                                else:
+                                    # Handle function failure
+                                    failure_response = self._generate_failure_response(
+                                        user_message, function_name, function_result
+                                    )
+                                    result["response"] = failure_response
+                                
+                                return result
             
-            # Fallback to basic domain response
-            return self._generate_basic_domain_response(user_message)
-            
-        except Exception as e:
-            logger.error(f"Error handling domain query with functions: {e}")
-            return self._generate_basic_domain_response(user_message)
-
-    def _generate_basic_domain_response(self, user_message: str) -> str:
-        """Generate basic response for domain queries"""
-        message_lower = user_message.lower()
-        
-        # Check for specific patterns and provide appropriate responses
-        if any(word in message_lower for word in ['contact', 'phone', 'number', 'call', 'reach']):
-            return "I'd be happy to connect you with our team! Please share your contact information (name, email, phone) so we can reach out."
-        
-        elif any(word in message_lower for word in ['apply', 'application', 'process']):
-            return "I can help with the application process! Please share your contact details and preferred country for personalized guidance."
-        
-        elif any(word in message_lower for word in ['requirements', 'documents', 'needed']):
-            return "I can help with requirements! Please share your contact info and target country for specific guidance."
-        
-        else:
-            return "I can help with student visa information! Please share your contact details and preferred country."
-
-    def _generate_out_of_domain_response(self, domain_check: Dict) -> str:
-        """Generate response for out-of-domain queries"""
-        confidence = domain_check.get('confidence', 0.0)
-        reason = domain_check.get('reason', '')
-        
-        if confidence > 0.8:
-            # High confidence out-of-domain
-            return "I specialize in student visas for USA, UK, Australia, and South Korea. For general questions, I recommend using ChatGPT or Google's Gemini."
-        else:
-            # Lower confidence - try to redirect to student visa topics
-            return "I specialize in student visa guidance for USA, UK, Australia, and South Korea. If you have questions about studying abroad, I'd be happy to help!"
-
-    def _create_tool_response_prompt(self, user_message: str, function_name: str, 
-                                    function_result: Dict, conversation_history: List[Dict]) -> str:
-        """Create a prompt for Gemini to generate a response using tool results"""
-        try:
-            prompt_parts = []
-            
-            # System context
-            prompt_parts.append("You are an AI assistant for AI Consultancy, specializing in student visas.")
-            prompt_parts.append("A function has been executed successfully. Generate a natural, helpful response.")
-            prompt_parts.append("")
-            prompt_parts.append("RESPONSE GUIDELINES:")
-            prompt_parts.append("1. Respond naturally like a friendly chatbot")
-            prompt_parts.append("2. Be conversational and helpful")
-            prompt_parts.append("3. Focus on the most relevant information")
-            prompt_parts.append("4. Avoid repetition and unnecessary details")
-            prompt_parts.append("")
-            
-            # User's original question
-            prompt_parts.append(f"User Question: {user_message}")
-            
-            # Function context
-            prompt_parts.append(f"Function Executed: {function_name}")
-            
-            # Function result
-            if function_result.get('data'):
-                prompt_parts.append(f"Function Result Data: {function_result['data']}")
-            
-            # Function message
-            if function_result.get('message'):
-                prompt_parts.append(f"Function Message: {function_result['message']}")
-            
-            # IMPORTANT: Handle function failures gracefully
-            if function_result.get('success') == False:
-                prompt_parts.append("\n⚠️ FUNCTION FAILED - Generate helpful response:")
-                prompt_parts.append("1. Acknowledge what the user asked for")
-                prompt_parts.append("2. Explain why it couldn't be processed (briefly)")
-                prompt_parts.append("3. Offer alternatives or supported options")
-                prompt_parts.append("4. Keep the conversation flowing naturally")
-                prompt_parts.append("5. Never leave the user with no information")
-            
-            # Conversation history (last 2 messages for context)
-            if conversation_history:
-                prompt_parts.append("\nRecent Conversation:")
-                for msg in conversation_history[-2:]:
-                    content = msg.get('content', msg.get('user_message', msg.get('user_input', '')))
-                    prompt_parts.append(f"- User: {content}")
-            
-            # Instructions based on function type
-            if function_name == "detect_and_save_contact_info":
-                prompt_parts.append("\nInstructions:")
-                prompt_parts.append("1. Thank the user for sharing their contact information")
-                prompt_parts.append("2. Mention that you've saved it for further guidance")
-                prompt_parts.append("3. Continue helping with the user's questions naturally")
-                prompt_parts.append("4. Be conversational and helpful")
+            # No function calls - generate basic response
+            if hasattr(response, 'text'):
+                result["response"] = response.text
             else:
-                prompt_parts.append("\nInstructions:")
-                prompt_parts.append("1. Continue helping the user naturally")
-                prompt_parts.append("2. Be conversational and helpful")
-                prompt_parts.append("3. Focus on their question or request")
+                result["response"] = "I understand your question. Let me help you with that."
             
-            return "\n".join(prompt_parts)
+            return result
             
         except Exception as e:
-            self.logger.error(f"Error creating tool response prompt: {e}")
-            # Fallback prompt
-            return f"User asked: {user_message}\n\nFunction {function_name} executed successfully. Generate a natural response."
-
-    def _generate_helpful_response(self, user_message: str, session_info) -> str:
-        """DEPRECATED: This method is no longer used - LLM handles everything"""
-        # This method is deprecated - LLM now handles all responses
-        return "I'm here to help you with student visa information. How can I assist you today?"
+            logger.error(f"Error processing function response: {e}")
+            return {
+                "response": "I encountered an error processing the response. Please try again.",
+                "success": False,
+                "error": str(e)
+            }
     
-    def _get_question_intro(self, session_info) -> str:
-        """DEPRECATED: This method is no longer used - LLM handles everything"""
-        # This method is deprecated - LLM now handles all follow-ups
-        return ""
+    def _generate_natural_response(self, user_message: str, function_name: str, function_result: Dict, conversation_history: List[Dict]) -> str:
+        """Generate natural response after successful function execution"""
+        try:
+            if not self.function_integrator:
+                return "Function executed successfully. How can I help you further?"
+            
+            # Create natural response prompt
+            prompt = self.function_integrator.create_natural_response_prompt(
+                user_message, function_name, function_result
+            )
+            
+            # Generate response
+            response = self.llm_model.generate_content(prompt)
+            if response and hasattr(response, 'text'):
+                return response.text
+            else:
+                return "Function completed successfully. How can I assist you further?"
+                
+        except Exception as e:
+            logger.error(f"Error generating natural response: {e}")
+            return "Function executed successfully. How can I help you further?"
     
-    def _should_ask_question_smart(self, session_info, rag_context: str, user_message: str) -> bool:
-        """DEPRECATED: This method is no longer used - LLM handles everything"""
-        # This method is deprecated - LLM now decides when to ask questions
-        return False
+    def _generate_failure_response(self, user_message: str, function_name: str, function_result: Dict) -> str:
+        """Generate helpful response when function fails"""
+        try:
+            if not self.function_integrator:
+                return "I encountered an issue. Please try again or ask a different question."
+            
+            # Create failure response prompt
+            prompt = self.function_integrator.create_failure_response_prompt(
+                user_message, function_name, function_result
+            )
+            
+            # Generate response
+            response = self.llm_model.generate_content(prompt)
+            if response and hasattr(response, 'text'):
+                return response.text
+            else:
+                return "I encountered an issue. Please try again or ask a different question."
+                
+        except Exception as e:
+            logger.error(f"Error generating failure response: {e}")
+            return "I encountered an issue. Please try again or ask a different question."
     
-    def get_response_metadata(self, session_id: str) -> Dict[str, Any]:
-        """Get metadata about the response generation"""
-        session_info = self.memory.get_user_info(session_id)
-        return {
-            "session_id": session_id,
-            "user_profile_complete": session_info.is_complete(),
-            "conversation_summary": session_info.conversation_summary,
-            "exchange_count": session_info.exchange_count
-        }
+    def update_session_memory(self, session_id: str, data: Dict[str, Any]):
+        """Update session memory with new information"""
+        try:
+            self.session_memory.update_session(session_id, data)
+            logger.info(f"Session memory updated for session {session_id}")
+        except Exception as e:
+            logger.error(f"Error updating session memory: {e}")
+    
+    def get_session_info(self, session_id: str) -> Optional[Any]:
+        """Get current session information"""
+        try:
+            return self.session_memory.get_user_info(session_id)
+        except Exception as e:
+            logger.error(f"Error getting session info: {e}")
+            return None
 
 # Global instance
-_smart_response_generator = SmartResponseGenerator()
-
-def get_smart_response_generator() -> SmartResponseGenerator:
-    """Get global smart response generator instance"""
-    return _smart_response_generator
+smart_response = SmartResponse()

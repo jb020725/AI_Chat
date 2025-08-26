@@ -1,18 +1,22 @@
 """
 Function Calling Module for AI Chatbot
 
-This module handles Gemini native function calling for:
-- Contact information collection
-- Country-specific searches  
-- Lead qualification
+This module handles clean, focused function calling for:
+- Vetted content lookup (get_answer)
+- Interest qualification (qualify_interest)
+- Consent management (request_consent)
+- Lead capture (save_lead)
+- Callback scheduling (schedule_callback)
+- Human notification (notify_human)
 """
 
-from .function_definitions import FUNCTIONS
-from .function_handlers import FunctionHandler
+from .function_definitions import FUNCTIONS, FUNCTION_METADATA
+from .function_handlers import function_handler
 from .function_integrator import FunctionIntegrator
 
 __all__ = [
     'FUNCTIONS',
-    'FunctionHandler', 
+    'FUNCTION_METADATA',
+    'function_handler', 
     'FunctionIntegrator'
 ]

@@ -1,566 +1,383 @@
 """
-Function Handlers for Gemini Native Function Calling
+Function Handlers for Clean Function-Calling Structure
 
-Handles the execution of functions called by the LLM:
-- Contact information collection
-- Country-specific searches
-- Lead qualification
+Handles the execution of focused, deterministic tools:
+- get_answer: Serve vetted content only
+- qualify_interest: Lightweight lead intent capture
+- request_consent: Explicit consent before PII collection
+- save_lead: Store contact after consent
+- schedule_callback: Optional immediate booking
+- notify_human: CRM handoff
 """
 
 import logging
 from typing import Dict, Any, Optional
+from datetime import datetime
 from app.memory.session_memory import get_session_memory
-# RAG disabled - using LLM knowledge only
 from app.tools.lead_capture_tool import LeadCaptureTool
-import time
 
 logger = logging.getLogger(__name__)
 
 class FunctionHandler:
-    """Handles execution of functions called by the LLM"""
+    """Handles execution of clean, focused tools"""
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        # Initialize lead capture tool
         self.lead_capture_tool = LeadCaptureTool()
-        # Initialize session memory
         self.session_memory = get_session_memory()
-    
-
         
-            
-    def provide_visa_information(self, session_id: str, **kwargs) -> Dict[str, Any]:
-        """
-        Provide helpful visa information and then politely offer contact option
-        """
+        # Vetted answer map - replace with your actual content
+        self.answer_map = {
+            "visa_overview": {
+                "title": "Student Visa Overview",
+                "body": "Student visas allow international students to study in foreign countries. Key requirements include acceptance letter, financial proof, and valid passport. Processing times vary by country.",
+                "last_reviewed": "2025-01-01"
+            },
+            "usa_visa": {
+                "title": "USA Student Visa (F-1)",
+                "body": "F-1 visa requires: SEVIS fee payment, Form DS-160, financial documents showing $25,000+ annually, acceptance letter, and proof of ties to home country.",
+                "last_reviewed": "2025-01-01"
+            },
+            "uk_visa": {
+                "title": "UK Student Visa (Tier 4)",
+                "body": "Tier 4 visa requires: CAS letter, financial evidence (£1,334/month for London, £1,023/month outside), English proficiency (IELTS 6.0+), and accommodation details.",
+                "last_reviewed": "2025-01-01"
+            },
+            "australia_visa": {
+                "title": "Australia Student Visa (Subclass 500)",
+                "body": "Subclass 500 requires: CoE (Confirmation of Enrolment), financial capacity proof, English proficiency, health insurance (OSHC), and genuine temporary entrant statement.",
+                "last_reviewed": "2025-01-01"
+            },
+            "south_korea_visa": {
+                "title": "South Korea Student Visa (D-2)",
+                "body": "D-2 visa requires: acceptance certificate, financial guarantee (minimum $10,000), health certificate, and proof of Korean language proficiency (TOPIK level 3+).",
+                "last_reviewed": "2025-01-01"
+            },
+            "required_documents": {
+                "title": "Required Documents",
+                "body": "Standard documents: passport, photos, application form, acceptance letter, financial statements, academic transcripts, English test scores, and health insurance.",
+                "last_reviewed": "2025-01-01"
+            },
+            "financial_proof_basics": {
+                "title": "Financial Proof Requirements",
+                "body": "Show sufficient funds for tuition + living expenses. Bank statements for 3-6 months, scholarship letters, or sponsor affidavits. Amount varies by country and city.",
+                "last_reviewed": "2025-01-01"
+            },
+            "consultancy_services": {
+                "title": "AI Consultancy Services",
+                "body": "We provide end-to-end visa assistance: document preparation, application submission, interview coaching, and post-approval support. Our success rate is 95%+.",
+                "last_reviewed": "2025-01-01"
+            },
+            "fees_and_packages": {
+                "title": "Fees and Packages",
+                "body": "Basic package: $500 (document review + application). Premium package: $1,200 (full service + interview prep). Payment plans available. No hidden fees.",
+                "last_reviewed": "2025-01-01"
+            },
+            "office_locations": {
+                "title": "Office Locations",
+                "body": "Main office: Kathmandu, Nepal. Branch offices: Pokhara, Chitwan. Virtual consultations available worldwide. Office hours: 9 AM - 6 PM (NPT).",
+                "last_reviewed": "2025-01-01"
+            },
+            "contact_options": {
+                "title": "Contact Options",
+                "body": "Phone: +977-1-4444444, WhatsApp: +977-9800000000, Email: info@aiconsultancy.com. Emergency line: +977-1-5555555. Response within 2 hours.",
+                "last_reviewed": "2025-01-01"
+            }
+        }
+    
+    def get_answer(self, session_id: str, **kwargs) -> Dict[str, Any]:
+        """Return vetted answer snippet about student visas or consultancy"""
         try:
-            user_query = kwargs.get('user_query', '')
-            target_country = kwargs.get('target_country', '').lower()
-            visa_topic = kwargs.get('visa_topic', 'general')
+            topic = kwargs.get('topic', '')
+            locale = kwargs.get('locale', 'en-US')
             
-            # Get session info to check if we already have contact details
-            session_info = self.session_memory.get_user_info(session_id)
-            has_contact = session_info and (session_info.email or session_info.phone)
+            if topic not in self.answer_map:
+                return {
+                    "success": False,
+                    "message": f"No vetted answer available for topic: {topic}",
+                    "data": {
+                        "suggestion": "An advisor can help with this specific question. Would you like a callback?",
+                        "available_topics": list(self.answer_map.keys())
+                    }
+                }
             
-            # Generate helpful visa information based on the query
-            if target_country in ['usa', 'united states', 'america']:
-                country_info = "USA"
-                visa_details = "For USA student visas, you'll need: F-1 visa, SEVIS fee, financial documents, acceptance letter, and proof of ties to Nepal."
-            elif target_country in ['uk', 'united kingdom', 'britain']:
-                country_info = "UK"
-                visa_details = "For UK student visas, you'll need: Student visa (Tier 4), CAS letter, financial evidence, English proficiency, and accommodation details."
-            elif target_country in ['australia']:
-                country_info = "Australia"
-                visa_details = "For Australia student visas, you'll need: Student visa (subclass 500), CoE, financial capacity, English proficiency, and health insurance."
-            elif target_country in ['south korea', 'korea']:
-                country_info = "South Korea"
-                visa_details = "For South Korea student visas, you'll need: D-2 visa, acceptance certificate, financial guarantee, and health certificate."
-            else:
-                country_info = "your chosen country"
-                visa_details = "I can provide specific information about USA, UK, Australia, and South Korea student visas."
-            
-            # Build the response
-            if has_contact:
-                # User already provided contact info - just give information
-                message = f"Here's what you need to know about {country_info} student visas:\n\n{visa_details}\n\nSince I have your contact information, I'll send you detailed requirements and updates. Is there anything specific you'd like to know about the {country_info} visa process?"
-                ask_for_contact = False
-            else:
-                # No contact info yet - provide info and politely offer contact option
-                message = f"Here's what you need to know about {country_info} student visas:\n\n{visa_details}\n\nIf you'd like someone from AI Consultancy to contact you for personalized guidance and detailed requirements, please leave your contact information. Otherwise, I'm here to answer your queries!"
-                ask_for_contact = True
+            answer = self.answer_map[topic]
             
             return {
                 "success": True,
-                "message": "Visa information provided successfully",
+                "message": "Vetted answer retrieved successfully",
                 "data": {
-                    "country": target_country,
-                    "visa_topic": visa_topic,
-                    "message": message,
-                    "ask_for_contact": ask_for_contact,
-                    "has_contact": has_contact
+                    "topic": topic,
+                    "locale": locale,
+                    "title": answer["title"],
+                    "body": answer["body"],
+                    "last_reviewed": answer["last_reviewed"],
+                    "cta": "If you'd like personalized guidance, I can have an advisor reach out to you."
                 }
             }
             
         except Exception as e:
-            self.logger.error(f"Error in provide_visa_information: {e}")
+            self.logger.error(f"Error in get_answer: {e}")
             return {
                 "success": False,
-                "message": f"Error providing visa information: {str(e)}",
-                "data": None
-            }
-
-    def handle_contact_request(self, session_id: str, **kwargs) -> Dict[str, Any]:
-        """
-        Smart contact request handler - detects both lead opportunities and time-sensitive contact needs
-        """
-        try:
-            user_query = kwargs.get('user_query', '').lower()
-            conversation_context = kwargs.get('conversation_context', {})
-            detected_interests = kwargs.get('detected_interests', [])
-            
-            # AI Consultancy contact numbers dictionary
-            AI_CONSULTANCY_NUMBERS = {
-                "primary": "+977-1-4444444",
-                "urgent": "+977-1-5555555", 
-                "whatsapp": "+977-9800000000",
-                "office": "+977-1-6666666"
-            }
-            
-            # Interest detection keywords - BOTH SERIOUS INTENT AND URGENCY
-            interest_keywords = [
-                # Action-oriented phrases (normal lead opportunity)
-                "i want to apply", "i am applying", "i will apply", "ready to apply",
-                "looking for guidance", "need guidance", "want guidance",
-                "help me apply", "assist me", "support me", "guide me through",
-                
-                # Company/service mentions (normal lead opportunity)
-                "ai consultancy", "ai consultancy education", "your company", "your service",
-                "you will help", "you can help", "you will process",
-                
-                # Contact expectations (normal lead opportunity)
-                "call me", "contact me", "reach me", "follow up",
-                "representative", "advisor", "counselor", "consultant",
-                "office visit", "meet you", "come to office",
-                
-                # Commitment phrases (normal lead opportunity)
-                "process my visa", "handle my application", "take care of",
-                "manage my case", "work on my visa", "start my process",
-                
-                # Timeline commitment (normal lead opportunity)
-                "march intake", "fall intake", "spring intake", "specific date",
-                "when should i", "what's the timeline", "deadline"
-            ]
-            
-            # TIME-SENSITIVE detection keywords (immediate human contact needed)
-            urgency_keywords = [
-                "urgent", "important", "time-sensitive", "immediate", "now",
-                "talk to someone", "need help now", "call me now", "immediately",
-                "asap", "right now", "this instant", "important", "high priority"
-            ]
-            
-            # Check if user shows serious interest OR urgency
-            shows_interest = any(keyword in user_query for keyword in interest_keywords)
-            shows_urgency = any(keyword in user_query for keyword in urgency_keywords)
-            
-            # Check if we already have contact info
-            session_info = self.session_memory.get_user_info(session_id)
-            has_contact = session_info and (session_info.email or session_info.phone)
-            
-            if shows_urgency:
-                # TIME-SENSITIVE CONTACT NEEDED - Give AI Consultancy number immediately
-                urgency_level = "high" if any(word in user_query for word in ["important", "time-sensitive", "high priority"]) else "urgent"
-                contact_preference = "call" if "call" in user_query else "any"
-                
-                message = f"🚨 I understand this is {urgency_level}! Here's our direct contact:\n\n📞 **AI Consultancy**: {AI_CONSULTANCY_NUMBERS['urgent']}\n📱 **WhatsApp**: {AI_CONSULTANCY_NUMBERS['whatsapp']}\n🏢 **Office**: {AI_CONSULTANCY_NUMBERS['office']}\n\n**Someone from our team will call you immediately!** Please share your phone number so we can reach you right away."
-                ask_for_contact = True
-                request_type = "urgent_contact"
-                
-            elif shows_interest and not has_contact:
-                # Normal lead opportunity detected
-                message = "I can see you're serious about this! To give you personalized guidance and keep you updated, could you share your name and email/phone number? I'll send you detailed information and important updates."
-                ask_for_contact = True
-                request_type = "lead_opportunity"
-                
-            else:
-                # No contact request needed
-                message = "Continue with your question about student visas."
-                ask_for_contact = False
-                request_type = "none"
-            
-            self.logger.info(f"Contact request handling for session {session_id}: {request_type} - {message}")
-            
-            return {
-                "success": True,
-                "data": {
-                    "request_type": request_type,
-                    "urgency_level": urgency_level if shows_urgency else "normal",
-                    "message": message,
-                    "ask_for_contact": ask_for_contact,
-                    "detected_interests": detected_interests,
-                    "conversation_context": conversation_context,
-                    "ai_consultancy_numbers": AI_CONSULTANCY_NUMBERS if shows_urgency else None
-                }
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Error in handle_contact_request: {e}")
-            return {
-                "success": False,
-                "message": f"Error: {str(e)}",
+                "message": f"Error retrieving answer: {str(e)}",
                 "data": None
             }
     
-    def handle_detect_and_save_contact_info(self, session_id: str, **kwargs) -> Dict[str, Any]:
-        """
-        Automatically detect, extract, and save contact information from user messages
-        """
+    def qualify_interest(self, session_id: str, **kwargs) -> Dict[str, Any]:
+        """Capture non-PII interest to personalize follow-ups"""
         try:
-            user_query = kwargs.get('user_query', '').lower()
-            conversation_context = kwargs.get('conversation_context', {})
-            extraction_mode = kwargs.get('extraction_mode', 'auto_detect')
+            study_country = kwargs.get('study_country', '')
+            study_level = kwargs.get('study_level', '')
+            target_intake = kwargs.get('target_intake', '')
+            notes = kwargs.get('notes', '')
             
-            # Get existing session info
+            # Store in session memory for later use
             session_info = self.session_memory.get_user_info(session_id)
+            if session_info:
+                session_info.study_country = study_country
+                session_info.study_level = study_level
+                session_info.target_intake = target_intake
+                session_info.notes = notes
             
-            # Initialize extracted data
-            extracted_data = {}
+            return {
+                "success": True,
+                "message": "Interest qualified successfully",
+                "data": {
+                    "study_country": study_country,
+                    "study_level": study_level,
+                    "target_intake": target_intake,
+                    "notes": notes,
+                    "next_step": "Would you like to share your contact information so an advisor can guide you personally?"
+                }
+            }
             
-            # Name extraction patterns - highly specific to avoid false matches
-            name_patterns = [
-                r"my name is ([A-Za-z]+(?:\s+[A-Za-z]+){0,3})(?:\s*[,.]|\s+and\s|$)",
-                r"i am ([A-Za-z]+(?:\s+[A-Za-z]+){0,3})(?=\s*[,.]|\s+and\s|$)(?!.*(?:applying|studying|interested|going|planning))",
-                r"i'm ([A-Za-z]+(?:\s+[A-Za-z]+){0,3})(?=\s*[,.]|\s+and\s|$)(?!.*(?:applying|studying|interested|going|planning))",
-                r"([A-Za-z]+(?:\s+[A-Za-z]+){0,3}) here(?!.*(?:applying|studying|interested))",
-                r"this is ([A-Za-z]+(?:\s+[A-Za-z]+){0,3})(?=\s*[,.]|\s+and\s|$)(?!.*(?:applying|studying|interested))",
-                r"([A-Za-z]+(?:\s+[A-Za-z]+){0,3}) is my name",
-                r"call me ([A-Za-z]+(?:\s+[A-Za-z]+){0,3})(?=\s*[,.]|\s+and\s|$)",
-                r"name:\s*([A-Za-z]+(?:\s+[A-Za-z]+){0,3})(?=\s*[,.]|\s+and\s|$)"
-            ]
+        except Exception as e:
+            self.logger.error(f"Error in qualify_interest: {e}")
+            return {
+                "success": False,
+                "message": f"Error qualifying interest: {str(e)}",
+                "data": None
+            }
+    
+    def request_consent(self, session_id: str, **kwargs) -> Dict[str, Any]:
+        """Record explicit user consent to store and contact them"""
+        try:
+            consent_text_version = kwargs.get('consent_text_version', 'v1.0')
+            consent = kwargs.get('consent', False)
             
-            # Email extraction patterns
-            email_patterns = [
-                r"email is ([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
-                r"my email ([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
-                r"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})",
-                r"email: ([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})"
-            ]
+            # Store consent in session memory
+            session_info = self.session_memory.get_user_info(session_id)
+            if session_info:
+                session_info.consent_given = consent
+                session_info.consent_version = consent_text_version
+                session_info.consent_timestamp = datetime.now().isoformat()
             
-            # Phone extraction patterns
-            phone_patterns = [
-                r"phone is (\d+)",
-                r"my phone (\d+)",
-                r"number is (\d+)",
-                r"my number (\d+)",
-                r"call me at (\d+)",
-                r"(\d{10,})"
-            ]
-            
-            # Country extraction patterns
-            country_patterns = [
-                r"interested in (usa|uk|australia|south korea)",
-                r"want to go to (usa|uk|australia|south korea)",
-                r"planning for (usa|uk|australia|south korea)",
-                r"for (usa|uk|australia|south korea)",
-                r"(usa|uk|australia|south korea) for",
-                r"studying in (usa|uk|australia|south korea)"
-            ]
-            
-            # Intake extraction patterns
-            intake_patterns = [
-                r"for (fall|spring|summer|march|september|january) (\d{4})",
-                r"(fall|spring|summer|march|september|january) (\d{4})",
-                r"planning (fall|spring|summer|march|september|january)",
-                r"(fall|spring|summer|march|september|january) intake",
-                r"intake (fall|spring|summer|march|september|january)"
-            ]
-            
-            # Program level extraction
-            program_patterns = [
-                r"(bachelor|master|phd|doctorate|undergraduate|graduate)",
-                r"studying (bachelor|master|phd|doctorate|undergraduate|graduate)",
-                r"(bachelor|master|phd|doctorate|undergraduate|graduate) degree"
-            ]
-            
-            import re
-            
-            # Extract name
-            for pattern in name_patterns:
-                match = re.search(pattern, user_query)
-                if match:
-                    extracted_data['name'] = match.group(1).title()
-                    break
-            
-            # Extract email
-            for pattern in email_patterns:
-                match = re.search(pattern, user_query)
-                if match:
-                    extracted_data['email'] = match.group(1).lower()
-                    break
-            
-            # Extract phone
-            for pattern in phone_patterns:
-                match = re.search(pattern, user_query)
-                if match:
-                    extracted_data['phone'] = match.group(1)
-                    break
-            
-            # Extract country
-            for pattern in country_patterns:
-                match = re.search(pattern, user_query)
-                if match:
-                    country = match.group(1).upper()
-                    if country == "USA":
-                        extracted_data['country'] = "USA"
-                    elif country == "UK":
-                        extracted_data['country'] = "UK"
-                    elif country == "AUSTRALIA":
-                        extracted_data['country'] = "Australia"
-                    elif country == "SOUTH KOREA":
-                        extracted_data['country'] = "South Korea"
-                    break
-            
-            # Extract intake
-            for pattern in intake_patterns:
-                match = re.search(pattern, user_query)
-                if match:
-                    if len(match.groups()) == 2:
-                        extracted_data['intake'] = f"{match.group(1).title()} {match.group(2)}"
-                    else:
-                        extracted_data['intake'] = match.group(1).title()
-                    break
-            
-            # Extract program level
-            for pattern in program_patterns:
-                match = re.search(pattern, user_query)
-                if match:
-                    extracted_data['program_level'] = match.group(1).title()
-                    break
-            
-            # Check if we extracted any new information
-            if not extracted_data:
+            if consent:
                 return {
                     "success": True,
+                    "message": "Consent recorded successfully",
                     "data": {
-                        "extracted": False,
-                        "message": "No new contact information detected in this message",
-                        "extracted_data": {},
-                        "session_info": session_info.__dict__ if session_info else None
+                        "consent": True,
+                        "consent_text_version": consent_text_version,
+                        "consent_timestamp": datetime.now().isoformat(),
+                        "next_step": "Great! Now I can help you save your contact information. What's your full name?"
                     }
                 }
-            
-            # Merge with existing session info
-            if session_info:
-                if 'name' in extracted_data and extracted_data['name']:
-                    session_info.name = extracted_data['name']
-                if 'email' in extracted_data and extracted_data['email']:
-                    session_info.email = extracted_data['email']
-                if 'phone' in extracted_data and extracted_data['phone']:
-                    session_info.phone = extracted_data['phone']
-                if 'country' in extracted_data and extracted_data['country']:
-                    session_info.country = extracted_data['country']
-                if 'intake' in extracted_data and extracted_data['intake']:
-                    session_info.intake = extracted_data['intake']
-                if 'program_level' in extracted_data and extracted_data['program_level']:
-                    session_info.program_level = extracted_data['program_level']
-            
-            # Debug logging
-            self.logger.info(f"DEBUG: extracted_data = {extracted_data}")
-            self.logger.info(f"DEBUG: name = {extracted_data.get('name')}")
-            self.logger.info(f"DEBUG: phone = {extracted_data.get('phone')}")
-            self.logger.info(f"DEBUG: email = {extracted_data.get('email')}")
-            self.logger.info(f"DEBUG: condition = {extracted_data.get('name') and (extracted_data.get('phone') or extracted_data.get('email'))}")
-            
-            # IMPROVED: Always check session memory for complete lead info
-            # Get current session info
-            session_name = session_info.name if session_info else None
-            session_phone = session_info.phone if session_info else None
-            session_email = session_info.email if session_info else None
-            
-            # Combine current extraction with session memory
-            current_name = extracted_data.get('name') or session_name
-            current_phone = extracted_data.get('phone') or session_phone
-            current_email = extracted_data.get('email') or session_email
-            current_country = extracted_data.get('country') or (session_info.country if session_info else None)
-            current_intake = extracted_data.get('intake') or (session_info.intake if session_info else None)
-            
-            # Debug logging
-            self.logger.info(f"LEAD SAVE CHECK - Name: {current_name}, Phone: {current_phone}, Email: {current_email}")
-            
-            # Check if we should ask for missing contact info FIRST
-            should_ask_for_contact = False
-            missing_contact_type = None
-            
-            # If we have a name but missing both email and phone, ask for contact
-            if current_name and not current_phone and not current_email:
-                should_ask_for_contact = True
-                missing_contact_type = "email_or_phone"
-            # If we have name and email but no phone, ask for phone
-            elif current_name and current_email and not current_phone:
-                should_ask_for_contact = True
-                missing_contact_type = "phone"
-            # If we have name and phone but no email, ask for email
-            elif current_name and current_phone and not current_email:
-                should_ask_for_contact = True
-                missing_contact_type = "email"
-            
-            # IMPROVED: Save lead with partial contact info (name + email OR phone)
-            if current_name and (current_phone or current_email) and not should_ask_for_contact:
-                # Determine contact method for message
-                contact_method = "phone" if current_phone else "email"
-                contact_value = current_phone or current_email
-                
-                lead_data = {
-                    "session_id": session_id,
-                    "name": current_name,
-                    "email": current_email or '',
-                    "phone": current_phone or '',
-                    "target_country": current_country or '',
-                    "intake": current_intake or '',
-                    "status": "new_lead"
-                }
-                
-                # Save to database
-                lead_result = self.lead_capture_tool.create_lead(lead_data)
-                
-                if lead_result.get('success'):
-                    lead_id = lead_result.get('lead_id', f"lead_{session_id}")
-                    self.logger.info(f"✅ Contact info saved as lead: {lead_id}")
-                    
-                    return {
-                        "success": True,
-                        "data": {
-                            "extracted": True,
-                            "saved_as_lead": True,
-                            "lead_id": lead_id,
-                            "message": f"Perfect! I've saved your information: {current_name}. You're all set!",
-                            "extracted_data": extracted_data,
-                            "session_info": session_info.__dict__ if session_info else None,
-                            "combined_data": {
-                                "name": current_name,
-                                "phone": current_phone,
-                                "email": current_email,
-                                "country": current_country
-                            }
-                        }
-                    }
-                else:
-                    self.logger.error(f"❌ Failed to save lead: {lead_result.get('error')}")
-                    # Continue to update session even if lead save fails
-            
-            # If we don't have complete lead info, update session and potentially ask for contact
-            response_data = {
-                "extracted": True,
-                "saved_as_lead": False,
-                "extracted_data": extracted_data,
-                "session_info": session_info.__dict__ if session_info else None
-            }
-            
-            if should_ask_for_contact:
-                if missing_contact_type == "email_or_phone":
-                    response_data["ask_for_contact"] = True
-                    response_data["contact_message"] = "Great! I have your name saved. To help you better with your student visa journey, would you like to share your email address or phone number so our AI Consultancy can assist you?"
-                elif missing_contact_type == "phone":
-                    response_data["ask_for_contact"] = True
-                    response_data["contact_message"] = "Perfect! I have your name and email. To provide you with the best assistance, would you like to share your phone number as well?"
-                elif missing_contact_type == "email":
-                    response_data["ask_for_contact"] = True
-                    response_data["contact_message"] = "Great! I have your name and phone number. To help you better, would you like to share your email address as well?"
             else:
-                response_data["message"] = f"I've updated your information with: {', '.join([f'{k}: {v}' for k, v in extracted_data.items() if v])}"
-            
-            return {
-                "success": True,
-                "data": response_data
-            }
-            
+                return {
+                    "success": True,
+                    "message": "Consent declined - continuing without contact storage",
+                    "data": {
+                        "consent": False,
+                        "consent_text_version": consent_text_version,
+                        "consent_timestamp": datetime.now().isoformat(),
+                        "message": "No problem! I'll continue answering your questions without storing contact details."
+                    }
+                }
+                
         except Exception as e:
-            self.logger.error(f"Error in detect_and_save_contact_info: {e}")
+            self.logger.error(f"Error in request_consent: {e}")
             return {
                 "success": False,
-                "message": f"Error: {str(e)}",
+                "message": f"Error recording consent: {str(e)}",
                 "data": None
             }
     
-    def handle_define_response_strategy(self, session_id: str, **kwargs) -> Dict[str, Any]:
-        """
-        Define response strategy for off-topic questions
-        """
+    def save_lead(self, session_id: str, **kwargs) -> Dict[str, Any]:
+        """Save lead with contact details after explicit consent"""
         try:
-            user_query = kwargs.get('user_query', '').lower()
-            rag_results_count = kwargs.get('rag_results_count', 0)
-            session_memory = kwargs.get('session_memory', {})
-            
-            # Define student visa scope (Nepal to specific countries)
-            student_visa_keywords = [
-                # Core visa topics
-                "student visa", "study visa", "education visa", "academic visa",
-                "study", "education", "university", "college", "school",
-                
-                # Target countries
-                "usa", "united states", "america", "us", "u.s.", "u.s.a",
-                "uk", "united kingdom", "britain", "england", "great britain",
-                "south korea", "korea", "korean", "seoul",
-                "australia", "aussie", "australian",
-                
-                # Visa types
-                "f-1", "m-1", "tier 4", "student route", "subclass 500", "d-2", "d-4",
-                
-                # Visa process
-                "visa requirements", "visa application", "visa process", "visa documents",
-                "financial requirements", "interview", "intake", "semester",
-                
-                # Nepal context
-                "nepal", "nepali", "nepalese"
-            ]
-            
-            # Check if query is on-topic
-            is_on_topic = any(keyword in user_query for keyword in student_visa_keywords)
-            
-            # Determine strategy
-            if is_on_topic:
-                strategy = "answer_with_knowledge"
-                reason = "Student visa question - use your knowledge and session memory"
-                instruction = "Use your knowledge and session memory to answer this student visa question"
-                
-            else:
-                strategy = "redirect_to_topic"
-                reason = "Question outside student visa scope - redirect to topic"
-                instruction = "Redirect user to student visa topics"
-            
-            self.logger.info(f"Response strategy for session {session_id}: {strategy} - {reason}")
-            
-            return {
-                "success": True,
-                "data": {
-                    "strategy": strategy,
-                    "reason": reason,
-                    "instruction": instruction,
-                    "is_on_topic": is_on_topic,
-                    "redirect_message": "Let's stay on topic. I can help with student visas from Nepal to USA, UK, South Korea, and Australia. What would you like to know about student visas?"
+            # Check if consent was given
+            session_info = self.session_memory.get_user_info(session_id)
+            if not session_info or not getattr(session_info, 'consent_given', False):
+                return {
+                    "success": False,
+                    "message": "Consent required before saving contact information",
+                    "data": {
+                        "error": "Please provide consent first using request_consent function"
+                    }
                 }
+            
+            full_name = kwargs.get('full_name', '')
+            email = kwargs.get('email', '')
+            phone_e164 = kwargs.get('phone_e164', '')
+            preferred_channel = kwargs.get('preferred_channel', 'phone')
+            study_country = kwargs.get('study_country', '') or getattr(session_info, 'study_country', '')
+            study_level = kwargs.get('study_level', '') or getattr(session_info, 'study_level', '')
+            target_intake = kwargs.get('target_intake', '') or getattr(session_info, 'target_intake', '')
+            notes = kwargs.get('notes', '') or getattr(session_info, 'notes', '')
+            consent_text_version = kwargs.get('consent_text_version', '') or getattr(session_info, 'consent_version', 'v1.0')
+            consent_timestamp = kwargs.get('consent_timestamp', '') or getattr(session_info, 'consent_timestamp', datetime.now().isoformat())
+            
+            # Validate required fields
+            if not full_name:
+                return {
+                    "success": False,
+                    "message": "Full name is required",
+                    "data": {
+                        "error": "Please provide your full name"
+                    }
+                }
+            
+            # Save to database
+            lead_data = {
+                "session_id": session_id,
+                "name": full_name,
+                "email": email or '',
+                "phone": phone_e164 or '',
+                "target_country": study_country or '',
+                "intake": target_intake or '',
+                "status": "new_lead",
+                "consent_version": consent_text_version,
+                "consent_timestamp": consent_timestamp
             }
+            
+            lead_result = self.lead_capture_tool.create_lead(lead_data)
+            
+            if lead_result.get('success'):
+                lead_id = lead_result.get('lead_id', f"lead_{session_id}")
+                
+                return {
+                    "success": True,
+                    "message": "Lead saved successfully",
+                    "data": {
+                        "lead_id": lead_id,
+                        "full_name": full_name,
+                        "contact_saved": True,
+                        "next_step": "Perfect! Your information is saved. Would you like me to schedule a callback with one of our advisors?"
+                    }
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"Failed to save lead: {lead_result.get('error')}",
+                    "data": None
+                }
                 
         except Exception as e:
-            self.logger.error(f"Error in define_response_strategy: {e}")
+            self.logger.error(f"Error in save_lead: {e}")
             return {
                 "success": False,
-                "message": f"Error: {str(e)}",
+                "message": f"Error saving lead: {str(e)}",
                 "data": None
             }
     
-
+    def schedule_callback(self, session_id: str, **kwargs) -> Dict[str, Any]:
+        """Create a callback task for a human advisor"""
+        try:
+            when_local = kwargs.get('when_local', '')
+            timezone = kwargs.get('timezone', 'Asia/Kathmandu')
+            channel = kwargs.get('channel', 'phone')
+            priority = kwargs.get('priority', 'normal')
+            
+            # For now, just log the callback request
+            # In production, integrate with your scheduling system
+            callback_data = {
+                "session_id": session_id,
+                "when_local": when_local,
+                "timezone": timezone,
+                "channel": channel,
+                "priority": priority,
+                "status": "scheduled"
+            }
+            
+            self.logger.info(f"Callback scheduled: {callback_data}")
+            
+            return {
+                "success": True,
+                "message": "Callback scheduled successfully",
+                "data": {
+                    "callback_id": f"cb_{session_id}_{int(datetime.now().timestamp())}",
+                    "when_local": when_local,
+                    "timezone": timezone,
+                    "channel": channel,
+                    "priority": priority,
+                    "message": f"Callback scheduled for {channel}. An advisor will contact you soon!"
+                }
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error in schedule_callback: {e}")
+            return {
+                "success": False,
+                "message": f"Error scheduling callback: {str(e)}",
+                "data": None
+            }
     
-
-
-    
-
-    
-
-    
-
+    def notify_human(self, session_id: str, **kwargs) -> Dict[str, Any]:
+        """Ping advisors with a concise summary"""
+        try:
+            lead_id = kwargs.get('lead_id', '')
+            summary = kwargs.get('summary', '')
+            priority = kwargs.get('priority', 'normal')
+            
+            # For now, just log the notification
+            # In production, integrate with Slack/email/Zapier
+            notification_data = {
+                "session_id": session_id,
+                "lead_id": lead_id,
+                "summary": summary,
+                "priority": priority,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            self.logger.info(f"Human notification: {notification_data}")
+            
+            return {
+                "success": True,
+                "message": "Human advisor notified successfully",
+                "data": {
+                    "notification_id": f"notif_{session_id}_{int(datetime.now().timestamp())}",
+                    "summary": summary,
+                    "priority": priority,
+                    "message": "Advisor has been notified and will follow up soon."
+                }
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error in notify_human: {e}")
+            return {
+                "success": False,
+                "message": f"Error notifying human: {str(e)}",
+                "data": None
+            }
     
     def execute_function(self, function_name: str, session_id: str, **kwargs) -> Dict[str, Any]:
-        """
-        Execute a function by name
-        
-        Args:
-            function_name: Name of function to execute
-            session_id: Current session ID
-            **kwargs: Function parameters
-            
-        Returns:
-            Dict with function execution result
-        """
+        """Execute a function by name"""
         self.logger.info(f"Executing function {function_name} for session {session_id}")
         
-        if function_name == "handle_contact_request":
-            return self.handle_contact_request(session_id, **kwargs)
-        elif function_name == "handle_contact_request":
-            return self.handle_contact_request(session_id, **kwargs)
-        elif function_name == "detect_and_save_contact_info":
-            return self.handle_detect_and_save_contact_info(session_id, **kwargs)
-        elif function_name == "define_response_strategy":
-            return self.handle_define_response_strategy(session_id, **kwargs)
+        if function_name == "get_answer":
+            return self.get_answer(session_id, **kwargs)
+        elif function_name == "qualify_interest":
+            return self.qualify_interest(session_id, **kwargs)
+        elif function_name == "request_consent":
+            return self.request_consent(session_id, **kwargs)
+        elif function_name == "save_lead":
+            return self.save_lead(session_id, **kwargs)
+        elif function_name == "schedule_callback":
+            return self.schedule_callback(session_id, **kwargs)
+        elif function_name == "notify_human":
+            return self.notify_human(session_id, **kwargs)
         else:
             return {
                 "success": False,
