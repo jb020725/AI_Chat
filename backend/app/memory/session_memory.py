@@ -188,16 +188,128 @@ class SessionMemory:
             self.supabase = None
     
     def _save_session_to_supabase(self, session_id: str, session_data: UserInfo) -> bool:
-        """Save session data to Supabase - DISABLED for now"""
-        # DISABLED: Don't save to Supabase - keep sessions in-memory only
-        logger.info(f"Session {session_id} NOT saved to Supabase (persistence disabled)")
-        return True
+        """Save session data to Supabase for persistence - ONLY for Telegram sessions"""
+        # Check if this is a Telegram session (permanent) or website session (temporary)
+        if not self._is_telegram_session(session_id):
+            logger.info(f"Session {session_id} is website session - not saving to database (temporary)")
+            return True  # Return success for temporary sessions
+            
+        if not self.supabase:
+            logger.warning(f"Cannot save Telegram session {session_id} - Supabase not available")
+            return False
+            
+        try:
+            # Convert session data to JSON-serializable format
+            session_record = {
+                "session_id": session_id,
+                "email": session_data.email,
+                "phone": session_data.phone,
+                "name": session_data.name,
+                "country": session_data.country,
+                "intake": session_data.intake,
+                "program_level": session_data.program_level,
+                "field_of_study": session_data.field_of_study,
+                "conversation_summary": session_data.conversation_summary,
+                "progress_state": session_data.progress_state,
+                "exchange_count": session_data.exchange_count,
+                "completed_steps": json.dumps(session_data.completed_steps),
+                "next_actions": json.dumps(session_data.next_actions),
+                "created_at": session_data.created_at.isoformat() if session_data.created_at else None,
+                "last_updated": session_data.last_updated.isoformat() if session_data.last_updated else None,
+                "platform": "telegram"  # Mark as Telegram session
+            }
+            
+            # Upsert session data (create or update)
+            result = self.supabase.table("sessions").upsert(session_record, on_conflict="session_id").execute()
+            
+            if result.data:
+                logger.info(f"Telegram session {session_id} saved to Supabase successfully")
+                return True
+            else:
+                logger.error(f"Failed to save Telegram session {session_id} to Supabase")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error saving Telegram session {session_id} to Supabase: {str(e)}")
+            return False
+    
+    def _is_telegram_session(self, session_id: str) -> bool:
+        """Check if session is from Telegram (should be permanent)"""
+        # Telegram sessions typically have specific patterns
+        telegram_patterns = [
+            "telegram_",           # telegram_123456789
+            "tg_",                 # tg_123456789
+            "bot_",                # bot_123456789
+            "chat_",               # chat_123456789
+            "user_"                # user_123456789
+        ]
+        
+        session_lower = session_id.lower()
+        return any(pattern in session_lower for pattern in telegram_patterns)
+    
+    def _is_website_session(self, session_id: str) -> bool:
+        """Check if session is from website (should be temporary)"""
+        # Website sessions typically have these patterns
+        website_patterns = [
+            "session_",            # session_1234567890
+            "web_",                # web_123456789
+            "widget_",             # widget_123456789
+            "browser_",            # browser_123456789
+            "temp_"                # temp_123456789
+        ]
+        
+        session_lower = session_id.lower()
+        return any(pattern in session_lower for pattern in website_patterns)
     
     def _load_session_from_supabase(self, session_id: str) -> Optional[UserInfo]:
-        """Load session data from Supabase - DISABLED for now"""
-        # DISABLED: Don't load from Supabase - always create new sessions
-        logger.info(f"Session {session_id} NOT loaded from Supabase (persistence disabled)")
-        return None
+        """Load session data from Supabase for persistence - ONLY for Telegram sessions"""
+        # Only load Telegram sessions from database
+        if not self._is_telegram_session(session_id):
+            logger.info(f"Session {session_id} is website session - not loading from database (temporary)")
+            return None
+            
+        if not self.supabase:
+            logger.warning(f"Cannot load Telegram session {session_id} - Supabase not available")
+            return None
+            
+        try:
+            # Query Supabase for Telegram session data
+            result = self.supabase.table("sessions").select("*").eq("session_id", session_id).eq("platform", "telegram").execute()
+            
+            if result.data and len(result.data) > 0:
+                session_data = result.data[0]
+                
+                # Create UserInfo object from Supabase data
+                user_info = UserInfo(
+                    email=session_data.get("email"),
+                    phone=session_data.get("phone"),
+                    name=session_data.get("name"),
+                    country=session_data.get("country"),
+                    intake=session_data.get("intake"),
+                    program_level=session_data.get("program_level"),
+                    field_of_study=session_data.get("field_of_study"),
+                    conversation_summary=session_data.get("conversation_summary", ""),
+                    progress_state=session_data.get("progress_state", "conversation_active"),
+                    exchange_count=session_data.get("exchange_count", 0),
+                    completed_steps=json.loads(session_data.get("completed_steps", "[]")),
+                    next_actions=json.loads(session_data.get("next_actions", "[]"))
+                )
+                
+                # Set timestamps if available
+                if session_data.get("created_at"):
+                    user_info.created_at = datetime.fromisoformat(session_data["created_at"])
+                if session_data.get("last_updated"):
+                    user_info.last_updated = datetime.fromisoformat(session_data["last_updated"])
+                
+                logger.info(f"Telegram session {session_id} loaded from Supabase successfully")
+                return user_info
+            else:
+                logger.info(f"No Telegram session data found in Supabase for {session_id}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error loading Telegram session {session_id} from Supabase: {str(e)}")
+            return None
     
     def _delete_session_from_supabase(self, session_id: str) -> bool:
         """Delete session data from Supabase - DISABLED for now"""
@@ -206,16 +318,21 @@ class SessionMemory:
         return True
     
     def get_session(self, session_id: str) -> UserInfo:
-        """Get or create session for user"""
+        """Get or create session for user - handles both temporary and permanent sessions"""
         if session_id not in self.sessions:
-            # Try to load from Supabase first
-            loaded_session = self._load_session_from_supabase(session_id)
-            if loaded_session:
-                self.sessions[session_id] = loaded_session
-                logger.info(f"Loaded existing session from Supabase: {session_id}")
+            # For Telegram sessions: try to load from Supabase first
+            if self._is_telegram_session(session_id):
+                loaded_session = self._load_session_from_supabase(session_id)
+                if loaded_session:
+                    self.sessions[session_id] = loaded_session
+                    logger.info(f"Loaded existing Telegram session from Supabase: {session_id}")
+                else:
+                    self.sessions[session_id] = UserInfo()
+                    logger.info(f"Created new Telegram session: {session_id}")
             else:
+                # For website sessions: always create new (temporary)
                 self.sessions[session_id] = UserInfo()
-                logger.info(f"Created new session: {session_id}")
+                logger.info(f"Created new website session (temporary): {session_id}")
         return self.sessions[session_id]
     
     def update_session(self, session_id: str, new_info: Dict[str, str]) -> None:
@@ -223,10 +340,10 @@ class SessionMemory:
         session = self.get_session(session_id)
         session.update_info(new_info)
         
-        # Don't save to Supabase - keep in memory only
-        # self._save_session_to_supabase(session_id, session)
+        # Save to Supabase
+        self._save_session_to_supabase(session_id, session)
         
-        logger.info(f"Updated session {session_id} with new info (in-memory only)")
+        logger.info(f"Updated session {session_id} with new info (persisted)")
     
     def get_user_info(self, session_id: str) -> UserInfo:
         """Get current user information for session"""
@@ -286,10 +403,10 @@ class SessionMemory:
         session = self.get_session(session_id)
         session.add_conversation_exchange(user_input, bot_response)
         
-        # Don't save to Supabase - keep in memory only
-        # self._save_session_to_supabase(session_id, session)
+        # Save to Supabase
+        self._save_session_to_supabase(session_id, session)
         
-        logger.info(f"Added conversation exchange to session {session_id} (in-memory only)")
+        logger.info(f"Added conversation exchange to session {session_id} (persisted)")
     
     def get_conversation_context(self, session_id: str) -> Dict[str, Any]:
         """Get comprehensive conversation context for LLM"""

@@ -374,6 +374,69 @@ class LeadCaptureTool:
                 "count": 0
             }
     
+    def get_leads_by_session(self, session_id: str) -> Dict[str, Any]:
+        """
+        Get all leads for a specific session ID.
+        
+        Args:
+            session_id: Session ID to search for
+            
+        Returns:
+            Dictionary with leads data or error
+        """
+        try:
+            if self.supabase:
+                # Query Supabase for leads with this session_id
+                result = self.supabase.table(self.table_name).select("*").eq("session_id", session_id).execute()
+                
+                if result.data:
+                    logger.info(f"Found {len(result.data)} leads for session {session_id}")
+                    return {
+                        "success": True,
+                        "data": result.data,
+                        "count": len(result.data),
+                        "message": f"Retrieved {len(result.data)} leads for session"
+                    }
+                else:
+                    logger.info(f"No leads found for session {session_id}")
+                    return {
+                        "success": True,
+                        "data": [],
+                        "count": 0,
+                        "message": "No leads found for this session"
+                    }
+            else:
+                # Mock mode - return mock data for testing
+                mock_leads = [
+                    {
+                        "id": f"mock_session_{session_id}_1",
+                        "email": "test@example.com",
+                        "name": "Test User",
+                        "phone": "1234567890",
+                        "target_country": "USA",
+                        "intake": "Fall 2025",
+                        "status": "new",
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "session_id": session_id
+                    }
+                ]
+                logger.info(f"Mock mode: Returning mock leads for session {session_id}")
+                return {
+                    "success": True,
+                    "data": mock_leads,
+                    "count": len(mock_leads),
+                    "message": "Mock leads retrieved for session"
+                }
+                
+        except Exception as e:
+            logger.error(f"Error getting leads by session {session_id}: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "data": [],
+                "count": 0
+            }
+    
 
     
     def health_check(self) -> Dict[str, Any]:
@@ -414,7 +477,8 @@ class LeadCaptureTool:
                 "create_lead",
                 "update_lead", 
                 "get_lead",
-                "search_leads"
+                "search_leads",
+                "get_leads_by_session"
             ],
             "supported_fields": [
                 "email", "name", "phone", "target_country", "intake", 

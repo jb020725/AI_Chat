@@ -192,17 +192,48 @@ SESSION CONTEXT:
 - Study country: {getattr(session_info, 'study_country', 'Not specified')}
 - Study level: {getattr(session_info, 'study_level', 'Not specified')}
 - Intake: {getattr(session_info, 'intake', 'Not specified')}
+- Session ID: {session_id}
 """
         
-        # Build conversation context
+        # Build conversation context - Last 5 exchanges instead of 3
         conversation_context = ""
         if conversation_history:
-            recent_messages = conversation_history[-3:]  # Last 3 messages
-            conversation_context = "\nRECENT CONVERSATION:\n"
-            for msg in recent_messages:
+            recent_messages = conversation_history[-5:]  # Last 5 messages
+            conversation_context = "\nRECENT CONVERSATION (Last 5 exchanges):\n"
+            for i, msg in enumerate(recent_messages, 1):
                 role = msg.get('role', 'user')
                 content = msg.get('content', msg.get('user_message', msg.get('user_input', '')))
-                conversation_context += f"- {role.title()}: {content}\n"
+                conversation_context += f"{i}. {role.title()}: {content}\n"
+        
+        # Get lead table data for this session
+        lead_table_data = ""
+        try:
+            if session_info and (session_info.email or session_info.phone):
+                # Get leads for this session/user
+                leads = self.lead_capture_tool.get_leads_by_session(session_id)
+                if leads and leads.get('success') and leads.get('data'):
+                    lead_table_data = "\nLEAD TABLE DATA (Current Session):\n"
+                    lead_table_data += "=" * 50 + "\n"
+                    for lead in leads['data']:
+                        lead_table_data += f"""
+Lead ID: {lead.get('id', 'N/A')}
+- Email: {lead.get('email', 'N/A')}
+- Name: {lead.get('name', 'N/A')}
+- Phone: {lead.get('phone', 'N/A')}
+- Target Country: {lead.get('target_country', 'N/A')}
+- Intake: {lead.get('intake', 'N/A')}
+- Status: {lead.get('status', 'N/A')}
+- Created: {lead.get('created_at', 'N/A')}
+- Session ID: {lead.get('session_id', 'N/A')}
+{'-' * 30}
+"""
+                else:
+                    lead_table_data = "\nLEAD TABLE DATA: No leads found for current session\n"
+            else:
+                lead_table_data = "\nLEAD TABLE DATA: User not yet identified (no email/phone)\n"
+        except Exception as e:
+            logger.error(f"Error getting lead table data: {e}")
+            lead_table_data = "\nLEAD TABLE DATA: Error retrieving data\n"
         
         # Add lead status to prompt
         lead_status = ""
@@ -232,11 +263,21 @@ SESSION CONTEXT:
             conversation_history=conversation_history
         )
         
-        # Add lead status if available
-        if lead_saved:
-            prompt += "\n\nLEAD STATUS: Contact information has been saved and an advisor will contact you soon."
+        # Add enhanced context sections
+        enhanced_context = f"""
+{conversation_context}
+
+{session_context}
+
+{lead_table_data}
+
+{lead_status}
+"""
         
-        return prompt
+        # Combine with the main prompt
+        final_prompt = prompt + enhanced_context
+        
+        return final_prompt
     
     def update_session_memory(self, session_id: str, data: Dict[str, Any]):
         """Update session memory with new information"""
