@@ -433,13 +433,15 @@ async def get_countries():
 async def get_version():
     """Get current version and deployment info"""
     return {
-        "version": "ENHANCED EXTRACTION VERSION 2.0",
+        "version": "ENHANCED EXTRACTION VERSION 2.1 - FORCE RESTART",
         "deployment_time": datetime.now().isoformat(),
+        "force_restart": True,
         "features": {
             "enhanced_extraction": "ENABLED",
             "debug_logging": "ENABLED",
             "study_level_detection": "FIXED",
-            "program_detection": "FIXED"
+            "program_detection": "FIXED",
+            "email_debugging": "ENABLED"
         }
     }
 
