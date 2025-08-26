@@ -276,7 +276,7 @@ class SmartResponse:
         return False
     
     def _extract_contact_info(self, message: str) -> Dict[str, str]:
-        """Extract contact information from user message - Improved accuracy"""
+        """Extract contact information from user message - Improved accuracy - DEPLOYMENT FIX"""
         contact_info = {}
         message_lower = message.lower()
         
