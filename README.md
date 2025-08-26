@@ -17,12 +17,12 @@ A production-ready AI chatbot with function calling and lead capture, built with
 
 ### **Frontend (Chatbot Interface):**
 ```
-https://ai-chatbot-frontend-971031410928.us-central1.run.app
+https://ai-chatbot-frontend-irsvqln4dq-uc.a.run.app
 ```
 
 ### **Backend (API Service):**
 ```
-https://ai-chatbot-backend-971031410928.us-central1.run.app
+https://ai-chatbot-backend-irsvqln4dq-uc.a.run.app
 ```
 
 ### **Quick Access Commands:**

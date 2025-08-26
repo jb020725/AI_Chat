@@ -6,8 +6,8 @@
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| **Frontend** | `https://ai-chatbot-frontend-971031410928.us-central1.run.app` | Main chatbot interface |
-| **Backend** | `https://ai-chatbot-backend-971031410928.us-central1.run.app` | API and lead capture |
+| **Frontend** | `https://ai-chatbot-frontend-irsvqln4dq-uc.a.run.app` | Main chatbot interface |
+| **Backend** | `https://ai-chatbot-backend-irsvqln4dq-uc.a.run.app` | API and lead capture |
 
 ### **🔧 Development URLs**
 
@@ -41,9 +41,9 @@ Your Code → GitHub Push → Auto Deploy → Live Chatbot
 
 ## **📞 Quick Reference**
 
-- **Live Chatbot**: `https://ai-chatbot-frontend-971031410928.us-central1.run.app`
-- **API Health**: `https://ai-chatbot-backend-971031410928.us-central1.run.app/health`
-- **Lead Monitoring**: `https://ai-chatbot-backend-971031410928.us-central1.run.app/api/leads`
+- **Live Chatbot**: `https://ai-chatbot-frontend-irsvqln4dq-uc.a.run.app`
+- **API Health**: `https://ai-chatbot-backend-irsvqln4dq-uc.a.run.app/health`
+- **Lead Monitoring**: `https://ai-chatbot-backend-irsvqln4dq-uc.a.run.app/api/leads`
 
 ---
 *Last Updated: 2025-08-26*

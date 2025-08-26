@@ -11,8 +11,8 @@ export const config = {
   permanentUrls: {
     // Production URLs - Set once, never change
     production: {
-      backend: 'https://ai-chatbot-backend-971031410928.us-central1.run.app',
-      frontend: 'https://ai-chatbot-frontend-971031410928.us-central1.run.app'
+      backend: 'https://ai-chatbot-backend-irsvqln4dq-uc.a.run.app',
+      frontend: 'https://ai-chatbot-frontend-irsvqln4dq-uc.a.run.app'
     },
     // Development URLs
     development: {
