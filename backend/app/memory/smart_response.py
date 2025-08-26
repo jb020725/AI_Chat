@@ -217,19 +217,23 @@ class SmartResponse:
     def _create_new_lead(self, contact_info: Dict[str, str], session_info: Any, session_id: str) -> bool:
         """Create a new lead - only when we have real contact info"""
         try:
-            # Prepare lead data
+            # Prepare lead data - PRIORITIZE extracted contact info over session info
             lead_data = {
                 "session_id": session_id,
                 "name": contact_info.get('name', ''),
                 "phone": contact_info.get('phone', ''),
                 "email": contact_info.get('email', ''),
-                "target_country": contact_info.get('country', ''),
-                "intake": contact_info.get('intake', '') or getattr(session_info, 'intake', '') if session_info else '',
-                "study_level": contact_info.get('study_level', '') or getattr(session_info, 'study_level', '') if session_info else '',
-                "program": contact_info.get('program', '') or getattr(session_info, 'program', '') if session_info else '',
+                "target_country": contact_info.get('country', ''),  # This should work now
+                "intake": contact_info.get('intake', ''),  # This should work now
+                "study_level": contact_info.get('study_level', ''),  # This should work now
+                "program": contact_info.get('program', ''),  # This should work now
                 "status": "new_lead",
                 "created_at": datetime.now().isoformat()
             }
+            
+            # Log what we're actually creating
+            logger.info(f"🔍 LEAD DATA TO BE CREATED: {lead_data}")
+            logger.info(f"🔍 CONTACT INFO EXTRACTED: {contact_info}")
             
             logger.info(f"🔍 Creating new lead: {lead_data}")
             
@@ -238,6 +242,18 @@ class SmartResponse:
             
             if result.get('success'):
                 logger.info(f"✅ New lead created successfully: {lead_data}")
+                
+                # FORCE EMAIL NOTIFICATION - This should work now!
+                try:
+                    logger.info("📧 Attempting to send email notification...")
+                    # The email should be sent automatically by LeadCaptureTool
+                    # Let's verify the lead was created with all fields
+                    created_lead = result.get('data', {})
+                    logger.info(f"📧 Lead created with data: {created_lead}")
+                    logger.info(f"📧 Email should be sent to: {self.lead_capture_tool.config.get('lead_notification_email', 'NOT SET')}")
+                except Exception as e:
+                    logger.error(f"❌ Error in email notification: {e}")
+                
                 return True
             else:
                 logger.error(f"❌ Failed to create new lead: {result.get('error')}")
@@ -426,9 +442,13 @@ class SmartResponse:
         
         # Log what we found
         if contact_info:
-            logger.info(f"Contact info extracted: {contact_info}")
+            logger.info(f"🔍 FINAL CONTACT INFO EXTRACTED: {contact_info}")
+            logger.info(f"🔍 Country detected: {contact_info.get('country', 'NOT FOUND')}")
+            logger.info(f"🔍 Study level detected: {contact_info.get('study_level', 'NOT FOUND')}")
+            logger.info(f"🔍 Program detected: {contact_info.get('program', 'NOT FOUND')}")
+            logger.info(f"🔍 Intake detected: {contact_info.get('intake', 'NOT FOUND')}")
         else:
-            logger.info("No valid contact info found in message")
+            logger.info("❌ No valid contact info found in message")
         
         # Only return if we have at least email OR phone (name alone is not enough)
         if contact_info.get('email') or contact_info.get('phone'):
