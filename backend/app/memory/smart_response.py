@@ -25,7 +25,22 @@ class SmartResponse:
         self.logger = logging.getLogger(__name__)
         self.session_memory = get_session_memory()
         self.llm_model = None
-        self.lead_capture_tool = LeadCaptureTool()
+        
+        # Initialize lead capture tool with proper configuration
+        from app.config import settings
+        config = {
+            "supabase_url": settings.SUPABASE_URL,
+            "supabase_service_role_key": settings.SUPABASE_SERVICE_ROLE_KEY,
+            "smtp_server": settings.SMTP_SERVER,
+            "smtp_port": settings.SMTP_PORT,
+            "smtp_username": settings.SMTP_USERNAME,
+            "smtp_password": settings.SMTP_PASSWORD,
+            "from_email": settings.FROM_EMAIL,
+            "from_name": settings.FROM_NAME,
+            "lead_notification_email": settings.LEAD_NOTIFICATION_EMAIL,
+            "enable_email_notifications": settings.ENABLE_EMAIL_NOTIFICATIONS
+        }
+        self.lead_capture_tool = LeadCaptureTool(config)
         
     def set_llm_model(self, llm_model):
         """Set the LLM model for responses"""
@@ -85,14 +100,20 @@ class SmartResponse:
     def _detect_and_save_lead(self, user_message: str, session_id: str) -> bool:
         """Detect if user provided contact info and save lead"""
         try:
+            logger.info(f"🔍 Lead detection started for message: '{user_message[:100]}...'")
+            
             # Extract contact information from message
             contact_info = self._extract_contact_info(user_message)
             
+            logger.info(f"🔍 Contact info extracted: {contact_info}")
+            
             if not contact_info:
+                logger.info("🔍 No contact info found, skipping lead creation")
                 return False
             
             # Get session info for additional details
             session_info = self.session_memory.get_user_info(session_id)
+            logger.info(f"🔍 Session info: {session_info}")
             
             # Prepare lead data
             lead_data = {
@@ -107,19 +128,25 @@ class SmartResponse:
                 "created_at": datetime.now().isoformat()
             }
             
+            logger.info(f"🔍 Lead data prepared: {lead_data}")
+            
             # Save to database
+            logger.info("🔍 Attempting to save lead to database...")
             result = self.lead_capture_tool.create_lead(lead_data)
             
+            logger.info(f"🔍 Lead creation result: {result}")
+            
             if result.get('success'):
-                logger.info(f"Lead saved successfully: {lead_data}")
-                # TODO: Send email notification here
+                logger.info(f"✅ Lead saved successfully: {lead_data}")
                 return True
             else:
-                logger.error(f"Failed to save lead: {result.get('error')}")
+                logger.error(f"❌ Failed to save lead: {result.get('error')}")
                 return False
                 
         except Exception as e:
-            logger.error(f"Error in lead detection and saving: {e}")
+            logger.error(f"❌ Error in lead detection and saving: {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
             return False
     
     def _extract_contact_info(self, message: str) -> Dict[str, str]:
@@ -127,51 +154,78 @@ class SmartResponse:
         contact_info = {}
         message_lower = message.lower()
         
-        # Extract email
+        # Extract email - More flexible pattern
         import re
         email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         email_match = re.search(email_pattern, message)
         if email_match:
             contact_info['email'] = email_match.group()
+            logger.info(f"Extracted email: {contact_info['email']}")
         
-        # Extract phone number
-        phone_pattern = r'\b\d{10,15}\b'
-        phone_match = re.search(phone_pattern, message)
-        if phone_match:
-            contact_info['phone'] = phone_match.group()
+        # Extract phone number - More flexible pattern
+        phone_patterns = [
+            r'\b\d{10,15}\b',  # Basic 10-15 digits
+            r'\+?\d[\d\s().-]{6,}\d',  # International format
+            r'\(\d{3}\)\s*\d{3}-\d{4}',  # US format (123) 456-7890
+        ]
         
-        # Extract name
+        for pattern in phone_patterns:
+            phone_match = re.search(pattern, message)
+            if phone_match:
+                # Clean the phone number
+                phone = re.sub(r'[^\d+]', '', phone_match.group())
+                if len(phone) >= 10:  # Must be at least 10 digits
+                    contact_info['phone'] = phone
+                    logger.info(f"Extracted phone: {contact_info['phone']}")
+                    break
+        
+        # Extract name - More flexible patterns
         name_patterns = [
             r'\bmy name is\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',
             r'\bi\'m\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',
             r'\bi am\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',
             r'\bname\s*:\s*([A-Za-z\s]+?)(?:\s*[,.]|$)',
-            r'\bcall me\s+([A-Za-z\s]+?)(?:\s*[,.]|$)'
+            r'\bcall me\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',
+            r'\bthis is\s+([A-Za-z\s]+?)(?:\s*[,.]|$)',
+            r'\b([A-Z][a-z]+)\s+([A-Z][a-z]+)',  # First Last format
         ]
         
         for pattern in name_patterns:
             name_match = re.search(pattern, message_lower, re.IGNORECASE)
             if name_match:
-                name = name_match.group(1).strip()
-                if name and len(name) > 1 and name not in ['user', 'test', 'example', 'sample']:
+                if len(name_match.groups()) == 1:
+                    name = name_match.group(1).strip()
+                else:
+                    # Handle First Last format
+                    name = ' '.join(name_match.groups()).strip()
+                
+                if name and len(name) > 1 and name.lower() not in ['user', 'test', 'example', 'sample', 'john', 'jane']:
                     contact_info['name'] = name.title()
+                    logger.info(f"Extracted name: {contact_info['name']}")
                     break
         
-        # Extract country
+        # Extract country - More flexible patterns
         country_patterns = {
-            'usa': ['usa', 'united states', 'america', 'us', 'u.s.', 'u.s.a'],
-            'uk': ['uk', 'united kingdom', 'britain', 'england', 'great britain'],
-            'australia': ['australia', 'aussie'],
-            'south_korea': ['south korea', 'korea', 'korean', 'seoul']
+            'usa': ['usa', 'united states', 'america', 'us', 'u.s.', 'u.s.a', 'states', 'united states of america'],
+            'uk': ['uk', 'united kingdom', 'britain', 'england', 'great britain', 'british'],
+            'australia': ['australia', 'aussie', 'australian'],
+            'south_korea': ['south korea', 'korea', 'korean', 'seoul', 'republic of korea']
         }
         
         for country, patterns in country_patterns.items():
             for pattern in patterns:
                 if pattern in message_lower:
                     contact_info['country'] = country
+                    logger.info(f"Extracted country: {contact_info['country']}")
                     break
             if 'country' in contact_info:
                 break
+        
+        # Log what we found
+        if contact_info:
+            logger.info(f"Contact info extracted: {contact_info}")
+        else:
+            logger.info("No contact info found in message")
         
         # Only return if we have at least some contact info
         if contact_info.get('email') or contact_info.get('phone') or contact_info.get('name'):

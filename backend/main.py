@@ -308,6 +308,34 @@ async def chat(request: Request, chat_request: ChatRequest):
         logger.error(f"Chat error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/leads")
+async def create_lead(lead_data: Dict[str, Any]):
+    """Create a new lead manually (for testing)"""
+    if not LEAD_CAPTURE_AVAILABLE or not lead_capture_tool:
+        raise HTTPException(status_code=503, detail="Lead capture system not available")
+    
+    try:
+        logger.info(f"Manual lead creation attempt: {lead_data}")
+        
+        # Create the lead
+        result = lead_capture_tool.create_lead(lead_data)
+        
+        if result.get('success'):
+            logger.info(f"Lead created successfully: {result}")
+            return {
+                "success": True,
+                "message": "Lead created successfully",
+                "lead_id": result.get('data', {}).get('id'),
+                "data": result.get('data')
+            }
+        else:
+            logger.error(f"Failed to create lead: {result}")
+            raise HTTPException(status_code=400, detail=f"Failed to create lead: {result.get('error')}")
+            
+    except Exception as e:
+        logger.error(f"Error creating lead: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/leads")
 async def get_leads():
     """Get leads from Supabase (for monitoring)"""
