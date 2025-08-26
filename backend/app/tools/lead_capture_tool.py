@@ -136,12 +136,18 @@ class LeadCaptureTool:
                     # Send email notification (with timeout protection)
                     email_result = {"success": False, "error": "Email not attempted"}
                     try:
+                        logger.info(f"📧 LEAD CAPTURE DEBUG: About to send email notification for lead {lead_id}")
+                        logger.info(f"📧 LEAD CAPTURE DEBUG: Lead data: {lead_data}")
+                        logger.info(f"📧 LEAD CAPTURE DEBUG: Email tool config: {self.email_tool.config if hasattr(self.email_tool, 'config') else 'NO CONFIG'}")
+                        
                         # Skip email for test sessions to improve performance
                         if not any(skip_word in lead_data.get("session_id", "").lower() for skip_word in ["test", "debug", "diagnostic"]):
+                            logger.info(f"📧 LEAD CAPTURE DEBUG: Not a test session, sending email...")
                             email_result = self.email_tool.send_lead_notification(
                                 lead_data=lead_data,
                                 conversation_context=self.config.get("conversation_context")
                             )
+                            logger.info(f"📧 LEAD CAPTURE DEBUG: Email result: {email_result}")
                             if email_result["success"]:
                                 logger.info("Lead notification email sent successfully")
                             else:
@@ -150,7 +156,10 @@ class LeadCaptureTool:
                             logger.info("Skipping email notification for test session")
                             email_result = {"success": True, "message": "Email skipped for test session"}
                     except Exception as e:
-                        logger.error(f"Error sending lead notification email: {str(e)}")
+                        logger.error(f"📧 LEAD CAPTURE DEBUG: Error sending lead notification email: {str(e)}")
+                        logger.error(f"📧 LEAD CAPTURE DEBUG: Exception type: {type(e)}")
+                        import traceback
+                        logger.error(f"📧 LEAD CAPTURE DEBUG: Traceback: {traceback.format_exc()}")
                     
                     return {
                         "success": True,

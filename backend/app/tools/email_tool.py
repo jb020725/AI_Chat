@@ -58,8 +58,15 @@ class EmailTool:
             Dictionary with operation result
         """
         try:
+            logger.info(f"📧 EMAIL DEBUG: send_lead_notification called with lead_data: {lead_data}")
+            logger.info(f"📧 EMAIL DEBUG: self.email_configured = {self.email_configured}")
+            logger.info(f"📧 EMAIL DEBUG: self.username = {self.username}")
+            logger.info(f"📧 EMAIL DEBUG: self.password = {'SET' if self.password else 'NOT SET'}")
+            logger.info(f"📧 EMAIL DEBUG: self.from_email = {self.from_email}")
+            logger.info(f"📧 EMAIL DEBUG: LEAD_NOTIFICATION_EMAIL = {settings.LEAD_NOTIFICATION_EMAIL}")
+            
             if not self.email_configured:
-                logger.info(f"Email not configured - would send lead notification for {lead_data.get('email', 'unknown')}")
+                logger.warning(f"📧 EMAIL DEBUG: Email not configured - would send lead notification for {lead_data.get('email', 'unknown')}")
                 return {
                     "success": False,
                     "error": "Email not configured",
