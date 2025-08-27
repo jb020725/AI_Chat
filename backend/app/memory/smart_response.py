@@ -102,7 +102,7 @@ class SmartResponse:
             }
     
     def _detect_and_save_lead(self, user_message: str, session_id: str) -> bool:
-        """Detect if user provided contact info and save/update lead - ONE PER CONVERSATION"""
+        """Detect if user provided contact info and save/update lead - ONE PER SESSION, ONE ROW PER LEAD"""
         try:
             logger.info(f"🔍 Lead detection started for message: '{user_message[:100]}...'")
             
@@ -111,15 +111,14 @@ class SmartResponse:
             
             logger.info(f"🔍 Contact info extracted: {contact_info}")
             
-            # Proceed if we have ANY useful information (email, phone, study level, program, country)
-            has_contact = contact_info.get('email') or contact_info.get('phone')
-            has_academic_info = contact_info.get('study_level') or contact_info.get('program') or contact_info.get('country')
+            # CRITICAL: Only proceed if we have REAL contact info (email or phone)
+            has_real_contact = contact_info.get('email') or contact_info.get('phone')
             
-            if not has_contact and not has_academic_info:
-                logger.info("🔍 No useful information (contact OR academic) found, skipping lead creation")
+            if not has_real_contact:
+                logger.info("🔍 No REAL contact info (email/phone) found, skipping lead creation")
                 return False
             
-            logger.info(f"🔍 Proceeding with lead creation - Contact: {has_contact}, Academic: {has_academic_info}")
+            logger.info(f"🔍 REAL contact info found - proceeding with lead management")
             
             # Get session info for additional details
             session_info = self.session_memory.get_user_info(session_id)
@@ -133,8 +132,8 @@ class SmartResponse:
                 # Update existing lead with new information
                 return self._update_existing_lead(existing_lead, contact_info, session_info)
             else:
-                logger.info(f"🔍 Creating new lead for session {session_id}")
-                # Create new lead
+                logger.info(f"🔍 Creating new lead for session {session_id} - FIRST TIME with contact info")
+                # Create new lead ONLY when we have real contact info
                 return self._create_new_lead(contact_info, session_info, session_id)
                 
         except Exception as e:
@@ -176,27 +175,33 @@ class SmartResponse:
                 if not existing_lead.get('phone') or existing_lead['phone'] == 'EMPTY':
                     update_data['phone'] = contact_info['phone']
             
-            # Update country if we have one
+            # Update country if we have one - ALWAYS update if we have better info
             if contact_info.get('country'):
-                if not existing_lead.get('target_country') or existing_lead['target_country'] == 'EMPTY':
+                if not existing_lead.get('target_country') or existing_lead['target_country'] in ['EMPTY', 'NULL', '']:
                     update_data['target_country'] = contact_info['country']
+                    logger.info(f"🔍 Updating country to: {contact_info['country']}")
             
-            # Update other fields from contact info or session info
+            # Update other fields from contact info or session info - ALWAYS update if we have better info
             if contact_info.get('intake'):
-                if not existing_lead.get('intake') or existing_lead['intake'] == '':
+                if not existing_lead.get('intake') or existing_lead['intake'] in ['', 'NULL']:
                     update_data['intake'] = contact_info['intake']
+                    logger.info(f"🔍 Updating intake to: {contact_info['intake']}")
             elif session_info and not existing_lead.get('intake') and getattr(session_info, 'intake', ''):
                 update_data['intake'] = session_info.intake
+                logger.info(f"🔍 Updating intake from session to: {session_info.intake}")
                 
             if contact_info.get('study_level'):
-                if not existing_lead.get('study_level') or existing_lead['study_level'] == '':
+                if not existing_lead.get('study_level') or existing_lead['study_level'] in ['', 'NULL']:
                     update_data['study_level'] = contact_info['study_level']
+                    logger.info(f"🔍 Updating study_level to: {contact_info['study_level']}")
             elif session_info and not existing_lead.get('study_level') and getattr(session_info, 'study_level', ''):
                 update_data['study_level'] = session_info.study_level
+                logger.info(f"🔍 Updating study_level from session to: {session_info.study_level}")
                 
             if contact_info.get('program'):
-                if not existing_lead.get('program') or existing_lead['program'] == '':
+                if not existing_lead.get('program') or existing_lead['program'] in ['', 'NULL']:
                     update_data['program'] = contact_info['program']
+                    logger.info(f"🔍 Updating program to: {contact_info['program']}")
             elif session_info and not existing_lead.get('program') and getattr(session_info, 'program', ''):
                 update_data['program'] = session_info.program
             
