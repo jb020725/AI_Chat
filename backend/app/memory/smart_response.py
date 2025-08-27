@@ -86,11 +86,17 @@ class SmartResponse:
                 # CRITICAL FIX: Update session memory with this exchange
                 self._update_session_memory_with_exchange(session_id, user_message, ai_response)
                 
+                # 🔍 NEW: Check if session should be auto-closed and email sent
+                session_closed = self._auto_close_session_if_needed(session_id, conversation_history)
+                if session_closed:
+                    logger.info(f"📧 Session {session_id} auto-closed and email sent")
+                
                 return {
                     "response": ai_response,
                     "success": True,
                     "function_calls": [],
-                    "user_info_extracted": contact_info
+                    "user_info_extracted": contact_info,
+                    "session_closed": session_closed
                 }
                 
             except Exception as e:
@@ -145,6 +151,64 @@ class SmartResponse:
                 logger.info(f"🔍 Session memory updated with exchange for session {session_id}")
         except Exception as e:
             logger.error(f"❌ Error updating session memory with exchange: {e}")
+    
+    def _should_close_session(self, session_id: str, conversation_history: List[Dict]) -> bool:
+        """Check if a session should be automatically closed"""
+        try:
+            if not conversation_history or len(conversation_history) < 2:
+                return False
+            
+            # Get the last few messages
+            recent_messages = conversation_history[-3:]
+            
+            # Check for session closing indicators
+            closing_indicators = [
+                'thank you', 'thanks', 'goodbye', 'bye', 'end', 'finish', 'done',
+                'that\'s all', 'that is all', 'no more questions', 'complete',
+                'session over', 'close session', 'end session'
+            ]
+            
+            last_user_message = recent_messages[-1].get('content', '').lower()
+            if any(indicator in last_user_message for indicator in closing_indicators):
+                logger.info(f"🔍 Session {session_id} should be closed - user indicated end")
+                return True
+            
+            # Check for inactivity (if we have timestamps)
+            # For now, we'll use a simple message count approach
+            if len(conversation_history) >= 10:  # Close after 10 exchanges
+                logger.info(f"🔍 Session {session_id} should be closed - reached exchange limit")
+                return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"❌ Error checking if session should close: {e}")
+            return False
+    
+    def _auto_close_session_if_needed(self, session_id: str, conversation_history: List[Dict]) -> bool:
+        """Automatically close session if conditions are met and send email"""
+        try:
+            if not self._should_close_session(session_id, conversation_history):
+                return False
+            
+            logger.info(f"🔍 Auto-closing session {session_id}")
+            
+            # Close session and send email
+            if self.lead_capture_tool:
+                result = self.lead_capture_tool.close_session_and_send_email(session_id)
+                if result.get('success'):
+                    logger.info(f"✅ Session {session_id} auto-closed and email sent: {result}")
+                    return True
+                else:
+                    logger.error(f"❌ Failed to auto-close session {session_id}: {result}")
+                    return False
+            else:
+                logger.warning(f"❌ Lead capture tool not available for session {session_id}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Error auto-closing session {session_id}: {e}")
+            return False
     
     def _detect_and_save_lead(self, user_message: str, session_id: str) -> bool:
         """Detect if user provided contact info and save/update lead - ONE PER SESSION, ONE ROW PER LEAD"""
@@ -669,22 +733,37 @@ def get_smart_response():
     """Get the properly configured smart_response instance"""
     global smart_response
     if smart_response is None:
-        # Initialize with proper configuration
-        from app.config import settings
-        config = {
-            "supabase_url": settings.SUPABASE_URL,
-            "supabase_service_role_key": settings.SUPABASE_SERVICE_ROLE_KEY,
-            "smtp_server": settings.SMTP_SERVER,
-            "smtp_port": settings.SMTP_PORT,
-            "smtp_username": settings.SMTP_USERNAME,
-            "smtp_password": settings.SMTP_PASSWORD,
-            "from_email": settings.FROM_EMAIL,
-            "from_name": settings.FROM_NAME,
-            "lead_notification_email": settings.LEAD_NOTIFICATION_EMAIL,
-            "enable_email_notifications": settings.ENABLE_EMAIL_NOTIFICATIONS
-        }
-        smart_response = SmartResponse()
-        # Initialize the lead capture tool with proper config
-        smart_response.lead_capture_tool = LeadCaptureTool(config)
-        logger.info("SmartResponse instance properly initialized with configuration")
+        try:
+            # Initialize with proper configuration
+            from app.config import settings
+            config = {
+                "supabase_url": settings.SUPABASE_URL,
+                "supabase_service_role_key": settings.SUPABASE_SERVICE_ROLE_KEY,
+                "smtp_server": settings.SMTP_SERVER,
+                "smtp_port": settings.SMTP_PORT,
+                "smtp_username": settings.SMTP_USERNAME,
+                "smtp_password": settings.SMTP_PASSWORD,
+                "from_email": settings.FROM_EMAIL,
+                "from_name": settings.FROM_NAME,
+                "lead_notification_email": settings.LEAD_NOTIFICATION_EMAIL,
+                "enable_email_notifications": settings.ENABLE_EMAIL_NOTIFICATIONS
+            }
+            
+            # Create SmartResponse instance
+            smart_response = SmartResponse()
+            
+            # Initialize the lead capture tool with proper config
+            from app.tools.lead_capture_tool import LeadCaptureTool
+            smart_response.lead_capture_tool = LeadCaptureTool(config)
+            
+            logger.info("✅ SmartResponse instance properly initialized with configuration")
+            logger.info(f"✅ Lead capture tool initialized: {smart_response.lead_capture_tool is not None}")
+            logger.info(f"✅ Session memory initialized: {smart_response.session_memory is not None}")
+            
+        except Exception as e:
+            logger.error(f"❌ Error initializing SmartResponse: {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            raise
+    
     return smart_response
