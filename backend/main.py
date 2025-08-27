@@ -463,7 +463,7 @@ async def get_status():
             "chat": "Active",
             "lead_capture": "Active",
             "session_memory": "Active for conversation flow",
-            "email_notifications": "Session-based (sent when session closes)",
+            "email_notifications": "Smart lead-based (sent when leads are complete)",
             "database": "Supabase integration active",
             "llm": "Gemini AI integration active"
         },
@@ -474,106 +474,8 @@ async def get_status():
         }
     }
 
-@app.post("/api/session/close")
-async def close_session(close_request: dict):
-    """
-    Close a session and send comprehensive email with all leads from that session.
-    This is the ONLY endpoint that triggers email sending for leads.
-    """
-    try:
-        session_id = close_request.get("session_id")
-        if not session_id:
-            return {
-                "success": False,
-                "error": "Session ID is required"
-            }
-        
-        logger.info(f"📧 SESSION CLOSE REQUEST: Closing session {session_id}")
-        
-        # Get the lead capture tool
-        from app.tools.lead_capture_tool import LeadCaptureTool
-        from app.config import settings
-        
-        config = {
-            "supabase_url": settings.SUPABASE_URL,
-            "supabase_service_role_key": settings.SUPABASE_SERVICE_ROLE_KEY,
-            "smtp_server": settings.SMTP_SERVER,
-            "smtp_port": settings.SMTP_PORT,
-            "smtp_username": settings.SMTP_USERNAME,
-            "smtp_password": settings.SMTP_PASSWORD,
-            "from_email": settings.FROM_EMAIL,
-            "from_name": settings.FROM_NAME,
-            "lead_notification_email": settings.LEAD_NOTIFICATION_EMAIL,
-            "enable_email_notifications": settings.ENABLE_EMAIL_NOTIFICATIONS
-        }
-        
-        lead_tool = LeadCaptureTool(config)
-        
-        # Close session and send email
-        result = lead_tool.close_session_and_send_email(session_id)
-        
-        logger.info(f"📧 SESSION CLOSE RESULT: {result}")
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"📧 SESSION CLOSE ERROR: {str(e)}")
-        import traceback
-        logger.error(f"📧 SESSION CLOSE TRACEBACK: {traceback.format_exc()}")
-        return {
-            "success": False,
-            "error": f"Session close failed: {str(e)}"
-        }
-
-@app.post("/api/session/close-manual")
-async def close_session_manual(close_request: dict):
-    """
-    Manually close a session and send email - can be called from frontend
-    """
-    try:
-        session_id = close_request.get("session_id")
-        if not session_id:
-            return {
-                "success": False,
-                "error": "Session ID is required"
-            }
-        
-        logger.info(f"📧 MANUAL SESSION CLOSE: Closing session {session_id}")
-        
-        # Get the lead capture tool
-        from app.tools.lead_capture_tool import LeadCaptureTool
-        from app.config import settings
-        
-        config = {
-            "supabase_url": settings.SUPABASE_URL,
-            "supabase_service_role_key": settings.SUPABASE_SERVICE_ROLE_KEY,
-            "smtp_server": settings.SMTP_SERVER,
-            "smtp_port": settings.SMTP_PORT,
-            "smtp_username": settings.SMTP_USERNAME,
-            "smtp_password": settings.SMTP_PASSWORD,
-            "from_email": settings.FROM_EMAIL,
-            "from_name": settings.FROM_NAME,
-            "lead_notification_email": settings.LEAD_NOTIFICATION_EMAIL,
-            "enable_email_notifications": settings.ENABLE_EMAIL_NOTIFICATIONS
-        }
-        
-        lead_tool = LeadCaptureTool(config)
-        
-        # Close session and send email
-        result = lead_tool.close_session_and_send_email(session_id)
-        
-        logger.info(f"📧 MANUAL SESSION CLOSE RESULT: {result}")
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"📧 MANUAL SESSION CLOSE ERROR: {str(e)}")
-        import traceback
-        logger.error(f"📧 MANUAL SESSION CLOSE TRACEBACK: {traceback.format_exc()}")
-        return {
-            "success": False,
-            "error": f"Manual session close failed: {str(e)}"
-        }
+# ⚠️ DEPRECATED: Session close endpoints removed - emails now sent automatically when leads complete
+# The new smart email system triggers emails based on lead completeness, not session closure
 
 @app.post("/api/test-lead-creation")
 async def test_lead_creation(test_data: dict):
