@@ -575,6 +575,52 @@ async def close_session_manual(close_request: dict):
             "error": f"Manual session close failed: {str(e)}"
         }
 
+@app.post("/api/test-lead-creation")
+async def test_lead_creation(test_data: dict):
+    """
+    Test endpoint to manually create a lead for debugging
+    """
+    try:
+        session_id = test_data.get("session_id", "test_session_123")
+        lead_data = test_data.get("lead_data", {})
+        
+        logger.info(f"🧪 TEST LEAD CREATION: Session {session_id}, Data: {lead_data}")
+        
+        # Get the lead capture tool
+        from app.tools.lead_capture_tool import LeadCaptureTool
+        from app.config import settings
+        
+        config = {
+            "supabase_url": settings.SUPABASE_URL,
+            "supabase_service_role_key": settings.SUPABASE_SERVICE_ROLE_KEY,
+            "smtp_server": settings.SMTP_SERVER,
+            "smtp_port": settings.SMTP_PORT,
+            "smtp_username": settings.SMTP_USERNAME,
+            "smtp_password": settings.SMTP_PASSWORD,
+            "from_email": settings.FROM_EMAIL,
+            "from_name": settings.FROM_NAME,
+            "lead_notification_email": settings.LEAD_NOTIFICATION_EMAIL,
+            "enable_email_notifications": settings.ENABLE_EMAIL_NOTIFICATIONS
+        }
+        
+        lead_tool = LeadCaptureTool(config)
+        
+        # Create test lead
+        result = lead_tool.create_lead(lead_data)
+        
+        logger.info(f"🧪 TEST LEAD CREATION RESULT: {result}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"🧪 TEST LEAD CREATION ERROR: {str(e)}")
+        import traceback
+        logger.error(f"🧪 TEST LEAD CREATION TRACEBACK: {traceback.format_exc()}")
+        return {
+            "success": False,
+            "error": f"Test lead creation failed: {str(e)}"
+        }
+
 # Initialize Memory System with LLM model (Clean Function Calling)
 if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
     try:

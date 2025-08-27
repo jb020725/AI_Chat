@@ -62,17 +62,18 @@ class SmartResponse:
                     "function_calls": []
                 }
             
-            # First, check if we need to save a lead
-            lead_saved = self._detect_and_save_lead(user_message, session_id)
-            
-            # Extract contact info for session memory update
+            # ✅ FIXED ORDER: Extract contact info FIRST
             contact_info = self._extract_contact_info(user_message)
+            logger.info(f"🔍 Contact info extracted: {contact_info}")
             
-            # CRITICAL FIX: Update session memory with extracted info
+            # ✅ FIXED ORDER: Update session memory with extracted info
             if contact_info:
                 self._update_session_memory_with_contact_info(session_id, contact_info)
             
-            # Create response prompt
+            # ✅ FIXED ORDER: Now detect and save/update lead with the extracted info
+            lead_saved = self._detect_and_save_lead(user_message, session_id)
+            
+            # Create response prompt with data from Supabase (not session memory)
             prompt = self._create_response_prompt(user_message, session_id, conversation_history, lead_saved)
             
             # Get response from LLM
@@ -83,20 +84,14 @@ class SmartResponse:
                 else:
                     ai_response = "I understand your question. Let me help you with that."
                 
-                # CRITICAL FIX: Update session memory with this exchange
+                # Update session memory with this exchange
                 self._update_session_memory_with_exchange(session_id, user_message, ai_response)
-                
-                # 🔍 NEW: Check if session should be auto-closed and email sent
-                session_closed = self._auto_close_session_if_needed(session_id, conversation_history)
-                if session_closed:
-                    logger.info(f"📧 Session {session_id} auto-closed and email sent")
                 
                 return {
                     "response": ai_response,
                     "success": True,
                     "function_calls": [],
-                    "user_info_extracted": contact_info,
-                    "session_closed": session_closed
+                    "user_info_extracted": contact_info
                 }
                 
             except Exception as e:
@@ -152,63 +147,7 @@ class SmartResponse:
         except Exception as e:
             logger.error(f"❌ Error updating session memory with exchange: {e}")
     
-    def _should_close_session(self, session_id: str, conversation_history: List[Dict]) -> bool:
-        """Check if a session should be automatically closed"""
-        try:
-            if not conversation_history or len(conversation_history) < 2:
-                return False
-            
-            # Get the last few messages
-            recent_messages = conversation_history[-3:]
-            
-            # Check for session closing indicators
-            closing_indicators = [
-                'thank you', 'thanks', 'goodbye', 'bye', 'end', 'finish', 'done',
-                'that\'s all', 'that is all', 'no more questions', 'complete',
-                'session over', 'close session', 'end session'
-            ]
-            
-            last_user_message = recent_messages[-1].get('content', '').lower()
-            if any(indicator in last_user_message for indicator in closing_indicators):
-                logger.info(f"🔍 Session {session_id} should be closed - user indicated end")
-                return True
-            
-            # Check for inactivity (if we have timestamps)
-            # For now, we'll use a simple message count approach
-            if len(conversation_history) >= 10:  # Close after 10 exchanges
-                logger.info(f"🔍 Session {session_id} should be closed - reached exchange limit")
-                return True
-            
-            return False
-            
-        except Exception as e:
-            logger.error(f"❌ Error checking if session should close: {e}")
-            return False
-    
-    def _auto_close_session_if_needed(self, session_id: str, conversation_history: List[Dict]) -> bool:
-        """Automatically close session if conditions are met and send email"""
-        try:
-            if not self._should_close_session(session_id, conversation_history):
-                return False
-            
-            logger.info(f"🔍 Auto-closing session {session_id}")
-            
-            # Close session and send email
-            if self.lead_capture_tool:
-                result = self.lead_capture_tool.close_session_and_send_email(session_id)
-                if result.get('success'):
-                    logger.info(f"✅ Session {session_id} auto-closed and email sent: {result}")
-                    return True
-                else:
-                    logger.error(f"❌ Failed to auto-close session {session_id}: {result}")
-                    return False
-            else:
-                logger.warning(f"❌ Lead capture tool not available for session {session_id}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"❌ Error auto-closing session {session_id}: {e}")
-            return False
+    # ❌ REMOVED: Auto-close session methods (only frontend-triggered)
     
     def _detect_and_save_lead(self, user_message: str, session_id: str) -> bool:
         """Detect if user provided contact info and save/update lead - ONE PER SESSION, ONE ROW PER LEAD"""
@@ -303,16 +242,17 @@ class SmartResponse:
                 if not existing_lead.get('study_level') or existing_lead['study_level'] in ['', 'NULL']:
                     update_data['study_level'] = contact_info['study_level']
                     logger.info(f"🔍 Updating study_level to: {contact_info['study_level']}")
-            elif session_info and not existing_lead.get('study_level') and getattr(session_info, 'study_level', ''):
-                update_data['study_level'] = session_info.study_level
-                logger.info(f"🔍 Updating study_level from session to: {session_info.study_level}")
+            elif session_info and not existing_lead.get('study_level') and getattr(session_info, 'program_level', ''):  # ✅ FIXED: Use correct field name
+                update_data['study_level'] = session_info.program_level
+                logger.info(f"🔍 Updating study_level from session to: {session_info.program_level}")
                 
             if contact_info.get('program'):
                 if not existing_lead.get('program') or existing_lead['program'] in ['', 'NULL']:
                     update_data['program'] = contact_info['program']
                     logger.info(f"🔍 Updating program to: {contact_info['program']}")
-            elif session_info and not existing_lead.get('program') and getattr(session_info, 'program', ''):
-                update_data['program'] = session_info.program
+            elif session_info and not existing_lead.get('program') and getattr(session_info, 'field_of_study', ''):  # ✅ FIXED: Use correct field name
+                update_data['program'] = session_info.field_of_study
+                logger.info(f"🔍 Updating program from session to: {session_info.field_of_study}")
             
             if not update_data:
                 logger.info("🔍 No new information to update in existing lead")
