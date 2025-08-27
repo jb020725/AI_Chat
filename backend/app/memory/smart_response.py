@@ -147,112 +147,81 @@ class SmartResponse:
         except Exception as e:
             logger.error(f"❌ Error updating session memory with exchange: {e}")
     
-    # ❌ REMOVED: Auto-close session methods (only frontend-triggered)
-    
-    def _detect_and_save_lead(self, user_message: str, session_id: str) -> bool:
-        """Detect if user provided contact info and save/update lead - ONE PER SESSION, ONE ROW PER LEAD"""
+    def _create_new_lead_simple(self, contact_info: Dict[str, str], session_info: Any, session_id: str) -> bool:
+        """Create a new lead with ANY information provided"""
         try:
-            logger.info(f"🔍 Lead detection started for message: '{user_message[:100]}...'")
+            # Prepare lead data - save whatever info we have
+            lead_data = {
+                "session_id": session_id,
+                "name": contact_info.get('name', ''),
+                "phone": contact_info.get('phone', ''),
+                "email": contact_info.get('email', ''),
+                "target_country": contact_info.get('country', ''),
+                "intake": contact_info.get('intake', ''),
+                "study_level": contact_info.get('study_level', ''),
+                "program": contact_info.get('program', ''),
+                "status": "new_lead",
+                "created_at": datetime.now().isoformat()
+            }
             
-            # Extract contact information from message
-            contact_info = self._extract_contact_info(user_message)
+            # Log what we're creating
+            logger.info(f"🔍 LEAD DATA TO BE CREATED: {lead_data}")
+            logger.info(f"🔍 INFO EXTRACTED: {contact_info}")
             
-            logger.info(f"🔍 Contact info extracted: {contact_info}")
+            # Save to database
+            result = self.lead_capture_tool.create_lead(lead_data)
             
-            # CRITICAL: Only proceed if we have REAL contact info (email or phone)
-            has_real_contact = contact_info.get('email') or contact_info.get('phone')
-            
-            if not has_real_contact:
-                logger.info("🔍 No REAL contact info (email/phone) found, skipping lead creation")
-                return False
-            
-            logger.info(f"🔍 REAL contact info found - proceeding with lead management")
-            
-            # Get session info for additional details
-            session_info = self.session_memory.get_user_info(session_id)
-            logger.info(f"🔍 Session info: {session_info}")
-            
-            # Check if lead already exists for this session
-            existing_lead = self._get_existing_lead(session_id)
-            
-            if existing_lead:
-                logger.info(f"🔍 Updating existing lead for session {session_id}")
-                # Update existing lead with new information
-                return self._update_existing_lead(existing_lead, contact_info, session_info)
+            if result.get('success'):
+                logger.info(f"✅ New lead created successfully: {lead_data}")
+                return True
             else:
-                logger.info(f"🔍 Creating new lead for session {session_id} - FIRST TIME with contact info")
-                # Create new lead ONLY when we have real contact info
-                return self._create_new_lead(contact_info, session_info, session_id)
+                logger.error(f"❌ Failed to create new lead: {result.get('error')}")
+                return False
                 
         except Exception as e:
-            logger.error(f"❌ Error in lead detection and saving: {e}")
-            import traceback
-            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            logger.error(f"❌ Error creating new lead: {e}")
             return False
     
-    def _get_existing_lead(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """Check if a lead already exists for this session"""
+    def _update_existing_lead_simple(self, existing_lead: Dict[str, Any], contact_info: Dict[str, str], session_info: Any) -> bool:
+        """Update existing lead with ANY new information"""
         try:
-            result = self.lead_capture_tool.get_leads_by_session(session_id)
-            if result.get('success') and result.get('data'):
-                # Return the first (and should be only) lead for this session
-                return result['data'][0]
-            return None
-        except Exception as e:
-            logger.error(f"Error checking existing lead: {e}")
-            return None
-    
-    def _update_existing_lead(self, existing_lead: Dict[str, Any], contact_info: Dict[str, str], session_info: Any) -> bool:
-        """Update existing lead with new information"""
-        try:
-            # Prepare update data - only update if we have better information
+            # Prepare update data - update with any new info
             update_data = {}
             
-            # Only update name if we have a better one (not random words)
-            if contact_info.get('name') and self._is_valid_name(contact_info['name']):
-                if not existing_lead.get('name') or self._is_better_name(contact_info['name'], existing_lead['name']):
-                    update_data['name'] = contact_info['name']
+            # Update name if we have one
+            if contact_info.get('name'):
+                update_data['name'] = contact_info['name']
+                logger.info(f"🔍 Updating name to: {contact_info['name']}")
             
-            # Update email if we have a real one
-            if contact_info.get('email') and '@' in contact_info['email']:
-                if not existing_lead.get('email') or existing_lead['email'].startswith('no-email-'):
-                    update_data['email'] = contact_info['email']
+            # Update email if we have one
+            if contact_info.get('email'):
+                update_data['email'] = contact_info['email']
+                logger.info(f"🔍 Updating email to: {contact_info['email']}")
             
-            # Update phone if we have a real one
-            if contact_info.get('phone') and len(contact_info['phone']) >= 10:
-                if not existing_lead.get('phone') or existing_lead['phone'] == 'EMPTY':
-                    update_data['phone'] = contact_info['phone']
+            # Update phone if we have one
+            if contact_info.get('phone'):
+                update_data['phone'] = contact_info['phone']
+                logger.info(f"🔍 Updating phone to: {contact_info['phone']}")
             
-            # Update country if we have one - ALWAYS update if we have better info
+            # Update country if we have one
             if contact_info.get('country'):
-                if not existing_lead.get('target_country') or existing_lead['target_country'] in ['EMPTY', 'NULL', '']:
-                    update_data['target_country'] = contact_info['country']
-                    logger.info(f"🔍 Updating country to: {contact_info['country']}")
+                update_data['target_country'] = contact_info['country']
+                logger.info(f"🔍 Updating country to: {contact_info['country']}")
             
-            # Update other fields from contact info or session info - ALWAYS update if we have better info
+            # Update intake if we have one
             if contact_info.get('intake'):
-                if not existing_lead.get('intake') or existing_lead['intake'] in ['', 'NULL']:
-                    update_data['intake'] = contact_info['intake']
-                    logger.info(f"🔍 Updating intake to: {contact_info['intake']}")
-            elif session_info and not existing_lead.get('intake') and getattr(session_info, 'intake', ''):
-                update_data['intake'] = session_info.intake
-                logger.info(f"🔍 Updating intake from session to: {session_info.intake}")
-                
+                update_data['intake'] = contact_info['intake']
+                logger.info(f"🔍 Updating intake to: {contact_info['intake']}")
+            
+            # Update study level if we have one
             if contact_info.get('study_level'):
-                if not existing_lead.get('study_level') or existing_lead['study_level'] in ['', 'NULL']:
-                    update_data['study_level'] = contact_info['study_level']
-                    logger.info(f"🔍 Updating study_level to: {contact_info['study_level']}")
-            elif session_info and not existing_lead.get('study_level') and getattr(session_info, 'program_level', ''):  # ✅ FIXED: Use correct field name
-                update_data['study_level'] = session_info.program_level
-                logger.info(f"🔍 Updating study_level from session to: {session_info.program_level}")
-                
+                update_data['study_level'] = contact_info['study_level']
+                logger.info(f"🔍 Updating study_level to: {contact_info['study_level']}")
+            
+            # Update program if we have one
             if contact_info.get('program'):
-                if not existing_lead.get('program') or existing_lead['program'] in ['', 'NULL']:
-                    update_data['program'] = contact_info['program']
-                    logger.info(f"🔍 Updating program to: {contact_info['program']}")
-            elif session_info and not existing_lead.get('program') and getattr(session_info, 'field_of_study', ''):  # ✅ FIXED: Use correct field name
-                update_data['program'] = session_info.field_of_study
-                logger.info(f"🔍 Updating program from session to: {session_info.field_of_study}")
+                update_data['program'] = contact_info['program']
+                logger.info(f"🔍 Updating program to: {contact_info['program']}")
             
             if not update_data:
                 logger.info("🔍 No new information to update in existing lead")
@@ -277,46 +246,69 @@ class SmartResponse:
             logger.error(f"❌ Error updating lead: {e}")
             return False
     
-    def _create_new_lead(self, contact_info: Dict[str, str], session_info: Any, session_id: str) -> bool:
-        """Create a new lead - only when we have real contact info"""
+    # ❌ REMOVED: Auto-close session methods (only frontend-triggered)
+    
+    def _detect_and_save_lead(self, user_message: str, session_id: str) -> bool:
+        """Detect if user provided ANY info and save/update lead - ONE PER SESSION, AUTO-UPDATE"""
         try:
-            # Prepare lead data - PRIORITIZE extracted contact info over session info
-            lead_data = {
-                "session_id": session_id,
-                "name": contact_info.get('name', ''),
-                "phone": contact_info.get('phone', ''),
-                "email": contact_info.get('email', ''),
-                "target_country": contact_info.get('country', ''),  # This should work now
-                "intake": contact_info.get('intake', ''),  # This should work now
-                "study_level": contact_info.get('study_level', ''),  # This should work now
-                "program": contact_info.get('program', ''),  # This should work now
-                "status": "new_lead",
-                "created_at": datetime.now().isoformat()
-            }
+            logger.info(f"🔍 Lead detection started for message: '{user_message[:100]}...'")
             
-            # Log what we're actually creating
-            logger.info(f"🔍 LEAD DATA TO BE CREATED: {lead_data}")
-            logger.info(f"🔍 CONTACT INFO EXTRACTED: {contact_info}")
+            # Extract information from message
+            contact_info = self._extract_contact_info(user_message)
             
-            logger.info(f"🔍 Creating new lead: {lead_data}")
+            logger.info(f"🔍 Info extracted: {contact_info}")
             
-            # Save to database
-            result = self.lead_capture_tool.create_lead(lead_data)
+            # ✅ NEW LOGIC: Save if ANY info is provided (not just contact info)
+            has_any_info = any([
+                contact_info.get('name'),
+                contact_info.get('email'), 
+                contact_info.get('phone'),
+                contact_info.get('country'),
+                contact_info.get('study_level'),
+                contact_info.get('program'),
+                contact_info.get('intake')
+            ])
             
-            if result.get('success'):
-                logger.info(f"✅ New lead created successfully: {lead_data}")
-                
-                # ✅ NEW SYSTEM: Email will be sent when session closes, not here
-                logger.info(f"📧 LEAD CREATED: Email will be sent when session closes for this lead")
-                
-                return True
-            else:
-                logger.error(f"❌ Failed to create new lead: {result.get('error')}")
+            if not has_any_info:
+                logger.info("🔍 No information found, skipping lead creation/update")
                 return False
+            
+            logger.info(f"🔍 Information found - proceeding with lead management")
+            
+            # Get session info for additional details
+            session_info = self.session_memory.get_user_info(session_id)
+            logger.info(f"🔍 Session info: {session_info}")
+            
+            # Check if lead already exists for this session
+            existing_lead = self._get_existing_lead(session_id)
+            
+            if existing_lead:
+                logger.info(f"🔍 Updating existing lead for session {session_id}")
+                logger.info(f"🔍 Existing lead data: {existing_lead}")
+                # Update existing lead with new information
+                return self._update_existing_lead_simple(existing_lead, contact_info, session_info)
+            else:
+                logger.info(f"🔍 Creating new lead for session {session_id} - FIRST TIME with info")
+                # Create new lead with ANY information
+                return self._create_new_lead_simple(contact_info, session_info, session_id)
                 
         except Exception as e:
-            logger.error(f"❌ Error creating new lead: {e}")
+            logger.error(f"❌ Error in lead detection and saving: {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
             return False
+    
+    def _get_existing_lead(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Check if a lead already exists for this session"""
+        try:
+            result = self.lead_capture_tool.get_leads_by_session(session_id)
+            if result.get('success') and result.get('data'):
+                # Return the first (and should be only) lead for this session
+                return result['data'][0]
+            return None
+        except Exception as e:
+            logger.error(f"Error checking existing lead: {e}")
+            return None
     
     def _is_valid_name(self, name: str) -> bool:
         """Check if a name is valid (not random words)"""
