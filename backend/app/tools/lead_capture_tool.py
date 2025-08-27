@@ -116,7 +116,7 @@ class LeadCaptureTool:
             
             # Prepare lead record
             lead_record = {
-                "email": lead_request.email if lead_request.email and "@" in lead_request.email else f"no-email-{int(datetime.now().timestamp())}@placeholder.com",
+                "email": lead_request.email if lead_request.email else None,  # ✅ FIXED: No more placeholder emails!
                 "name": lead_request.name,
                 "phone": lead_request.phone,
                 "target_country": lead_request.target_country,
