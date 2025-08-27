@@ -567,14 +567,15 @@ Focus on providing helpful visa information and guidance instead.
                 content = msg.get('content', msg.get('user_message', msg.get('user_input', '')))
                 conversation_context += f"{i}. {role.title()}: {content}\n"
         
-        # Get lead table data for this session
+        # ✅ RESTORED: Lead table data is essential for LLM to see what's already saved
+        # This prevents the LLM from asking for information already provided
         lead_table_data = ""
         try:
             if session_info and (session_info.email or session_info.phone):
                 # Get leads for this session/user
                 leads = self.lead_capture_tool.get_leads_by_session(session_id)
                 if leads and leads.get('success') and leads.get('data'):
-                    lead_table_data = "\nLEAD TABLE DATA (Current Session):\n"
+                    lead_table_data = "\nLEAD TABLE DATA (Already Saved in Database):\n"
                     lead_table_data += "=" * 50 + "\n"
                     for lead in leads['data']:
                         lead_table_data += f"""
@@ -627,7 +628,7 @@ Lead ID: {lead.get('id', 'N/A')}
             conversation_history=conversation_history
         )
         
-        # Add enhanced context sections
+        # Add enhanced context sections (CLEAN - no duplicates)
         enhanced_context = f"""
 {existing_lead_data}
 
