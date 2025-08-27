@@ -40,6 +40,7 @@ class LeadCreateRequest(BaseModel):
 
 class LeadUpdateRequest(BaseModel):
     """Request model for updating a lead"""
+    email: Optional[str] = None  # ✅ ADDED: email field for updates!
     name: Optional[str] = None
     phone: Optional[str] = None
     target_country: Optional[str] = None
