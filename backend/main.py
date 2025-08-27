@@ -23,6 +23,7 @@ import re
 import asyncio
 from collections import defaultdict
 import time
+import platform
 
 # Rate Limiting Imports
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -453,22 +454,76 @@ async def get_version():
 
 @app.get("/api/status")
 async def get_status():
-    """Get system status"""
+    """Get system status and configuration"""
     return {
         "status": "operational",
         "timestamp": datetime.now().isoformat(),
-        "version": "3.0.0",
-        "components": {
-            "rag_system": "completely_removed",
-            "memory_system": "operational" if MEMORY_AVAILABLE else "unavailable",
-            "lead_capture": "operational" if LEAD_CAPTURE_AVAILABLE else "unavailable",
-            "gemini_ai": "operational" if GEMINI_AVAILABLE else "unavailable",
-            "rate_limiting": "operational",
-            "concurrency_control": "operational",
-            "simple_chatbot": "operational" if MEMORY_AVAILABLE and GEMINI_AVAILABLE else "unavailable"
+        "version": "1.0.0",
+        "features": {
+            "chat": "Active",
+            "lead_capture": "Active",
+            "session_memory": "Active for conversation flow",
+            "email_notifications": "Session-based (sent when session closes)",
+            "database": "Supabase integration active",
+            "llm": "Gemini AI integration active"
         },
-        "uptime": 0  # You can add actual uptime calculation if needed
+        "system_info": {
+            "python_version": sys.version,
+            "platform": platform.platform(),
+            "uptime": "Active"
+        }
     }
+
+@app.post("/api/session/close")
+async def close_session(close_request: dict):
+    """
+    Close a session and send comprehensive email with all leads from that session.
+    This is the ONLY endpoint that triggers email sending for leads.
+    """
+    try:
+        session_id = close_request.get("session_id")
+        if not session_id:
+            return {
+                "success": False,
+                "error": "Session ID is required"
+            }
+        
+        logger.info(f"📧 SESSION CLOSE REQUEST: Closing session {session_id}")
+        
+        # Get the lead capture tool
+        from app.tools.lead_capture_tool import LeadCaptureTool
+        from app.config import settings
+        
+        config = {
+            "supabase_url": settings.SUPABASE_URL,
+            "supabase_service_role_key": settings.SUPABASE_SERVICE_ROLE_KEY,
+            "smtp_server": settings.SMTP_SERVER,
+            "smtp_port": settings.SMTP_PORT,
+            "smtp_username": settings.SMTP_USERNAME,
+            "smtp_password": settings.SMTP_PASSWORD,
+            "from_email": settings.FROM_EMAIL,
+            "from_name": settings.FROM_NAME,
+            "lead_notification_email": settings.LEAD_NOTIFICATION_EMAIL,
+            "enable_email_notifications": settings.ENABLE_EMAIL_NOTIFICATIONS
+        }
+        
+        lead_tool = LeadCaptureTool(config)
+        
+        # Close session and send email
+        result = lead_tool.close_session_and_send_email(session_id)
+        
+        logger.info(f"📧 SESSION CLOSE RESULT: {result}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"📧 SESSION CLOSE ERROR: {str(e)}")
+        import traceback
+        logger.error(f"📧 SESSION CLOSE TRACEBACK: {traceback.format_exc()}")
+        return {
+            "success": False,
+            "error": f"Session close failed: {str(e)}"
+        }
 
 # Initialize Memory System with LLM model (Clean Function Calling)
 if MEMORY_AVAILABLE and GEMINI_AVAILABLE:

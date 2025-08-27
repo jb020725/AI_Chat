@@ -13,6 +13,7 @@ Features:
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+import re
 from app.memory.session_memory import get_session_memory
 from app.tools.lead_capture_tool import LeadCaptureTool
 
@@ -67,6 +68,10 @@ class SmartResponse:
             # Extract contact info for session memory update
             contact_info = self._extract_contact_info(user_message)
             
+            # CRITICAL FIX: Update session memory with extracted info
+            if contact_info:
+                self._update_session_memory_with_contact_info(session_id, contact_info)
+            
             # Create response prompt
             prompt = self._create_response_prompt(user_message, session_id, conversation_history, lead_saved)
             
@@ -78,11 +83,14 @@ class SmartResponse:
                 else:
                     ai_response = "I understand your question. Let me help you with that."
                 
+                # CRITICAL FIX: Update session memory with this exchange
+                self._update_session_memory_with_exchange(session_id, user_message, ai_response)
+                
                 return {
                     "response": ai_response,
                     "success": True,
                     "function_calls": [],
-                    "user_info_extracted": contact_info  # Return extracted info for session memory
+                    "user_info_extracted": contact_info
                 }
                 
             except Exception as e:
@@ -100,6 +108,43 @@ class SmartResponse:
                 "success": False,
                 "error": str(e)
             }
+
+    def _update_session_memory_with_contact_info(self, session_id: str, contact_info: Dict[str, str]):
+        """Update session memory with extracted contact info"""
+        try:
+            update_data = {}
+            
+            if contact_info.get('name'):
+                update_data['name'] = contact_info['name']
+            if contact_info.get('email'):
+                update_data['email'] = contact_info['email']
+            if contact_info.get('phone'):
+                update_data['phone'] = contact_info['phone']
+            if contact_info.get('country'):
+                update_data['country'] = contact_info['country']
+            if contact_info.get('intake'):
+                update_data['intake'] = contact_info['intake']
+            if contact_info.get('study_level'):
+                update_data['program_level'] = contact_info['study_level']  # ✅ Correct: Map to session memory field
+            if contact_info.get('program'):
+                update_data['field_of_study'] = contact_info['program']  # ✅ Correct: Map to session memory field
+            
+            if update_data:
+                logger.info(f"🔍 Updating session memory with: {update_data}")
+                self.session_memory.update_session(session_id, update_data)
+            
+        except Exception as e:
+            logger.error(f"❌ Error updating session memory: {e}")
+
+    def _update_session_memory_with_exchange(self, session_id: str, user_message: str, bot_response: str):
+        """Update session memory with conversation exchange"""
+        try:
+            session_info = self.session_memory.get_user_info(session_id)
+            if session_info:
+                session_info.add_conversation_exchange(user_message, bot_response)
+                logger.info(f"🔍 Session memory updated with exchange for session {session_id}")
+        except Exception as e:
+            logger.error(f"❌ Error updating session memory with exchange: {e}")
     
     def _detect_and_save_lead(self, user_message: str, session_id: str) -> bool:
         """Detect if user provided contact info and save/update lead - ONE PER SESSION, ONE ROW PER LEAD"""
@@ -257,16 +302,8 @@ class SmartResponse:
             if result.get('success'):
                 logger.info(f"✅ New lead created successfully: {lead_data}")
                 
-                # FORCE EMAIL NOTIFICATION - This should work now!
-                try:
-                    logger.info("📧 Attempting to send email notification...")
-                    # The email should be sent automatically by LeadCaptureTool
-                    # Let's verify the lead was created with all fields
-                    created_lead = result.get('data', {})
-                    logger.info(f"📧 Lead created with data: {created_lead}")
-                    logger.info(f"📧 Email should be sent to: {self.lead_capture_tool.config.get('lead_notification_email', 'NOT SET')}")
-                except Exception as e:
-                    logger.error(f"❌ Error in email notification: {e}")
+                # ✅ NEW SYSTEM: Email will be sent when session closes, not here
+                logger.info(f"📧 LEAD CREATED: Email will be sent when session closes for this lead")
                 
                 return True
             else:
@@ -481,18 +518,44 @@ class SmartResponse:
     def _create_response_prompt(self, user_message: str, session_id: str, conversation_history: List[Dict], lead_saved: bool) -> str:
         """Create response prompt for the chatbot"""
         
-        # Get session context
+        # Get session info for additional details
         session_info = self.session_memory.get_user_info(session_id)
         session_context = ""
         if session_info:
             session_context = f"""
 SESSION CONTEXT:
 - Has contact info: {bool(session_info.email or session_info.phone)}
-- Study country: {getattr(session_info, 'study_country', 'Not specified')}
-- Study level: {getattr(session_info, 'study_level', 'Not specified')}
+- Study country: {getattr(session_info, 'country', 'Not specified')}
+- Study level: {getattr(session_info, 'program_level', 'Not specified')}  # ✅ Correct: Use session memory field
 - Intake: {getattr(session_info, 'intake', 'Not specified')}
+- Program: {getattr(session_info, 'field_of_study', 'Not specified')}  # ✅ Correct: Use session memory field
 - Session ID: {session_id}
 """
+        
+        # CRITICAL FIX: Get existing lead data for this session
+        existing_lead_data = ""
+        try:
+            existing_lead = self._get_existing_lead(session_id)
+            if existing_lead:
+                existing_lead_data = f"""
+EXISTING LEAD DATA (DO NOT ASK FOR THIS INFORMATION AGAIN):
+- Email: {existing_lead.get('email', 'N/A')}
+- Name: {existing_lead.get('name', 'N/A')}
+- Phone: {existing_lead.get('phone', 'N/A')}
+- Target Country: {existing_lead.get('target_country', 'N/A')}
+- Intake: {existing_lead.get('intake', 'N/A')}
+- Study Level: {existing_lead.get('study_level', 'N/A')}
+- Program: {existing_lead.get('program', 'N/A')}
+- Status: {existing_lead.get('status', 'N/A')}
+
+IMPORTANT: User has already provided this information. DO NOT ask for it again.
+Focus on providing helpful visa information and guidance instead.
+"""
+            else:
+                existing_lead_data = "\nEXISTING LEAD DATA: No lead found for this session yet.\n"
+        except Exception as e:
+            logger.error(f"Error getting existing lead data: {e}")
+            existing_lead_data = "\nEXISTING LEAD DATA: Error retrieving data\n"
         
         # Build conversation context - Last 5 exchanges instead of 3
         conversation_context = ""
@@ -521,6 +584,8 @@ Lead ID: {lead.get('id', 'N/A')}
 - Phone: {lead.get('phone', 'N/A')}
 - Target Country: {lead.get('target_country', 'N/A')}
 - Intake: {lead.get('intake', 'N/A')}
+- Study Level: {lead.get('study_level', 'N/A')}
+- Program: {lead.get('program', 'N/A')}
 - Status: {lead.get('status', 'N/A')}
 - Created: {lead.get('created_at', 'N/A')}
 - Session ID: {lead.get('session_id', 'N/A')}
@@ -548,7 +613,7 @@ Lead ID: {lead.get('id', 'N/A')}
         user_info = {}
         if session_info:
             user_info = {
-                'country': getattr(session_info, 'study_country', ''),
+                'country': getattr(session_info, 'country', ''),
                 'email': getattr(session_info, 'email', ''),
                 'name': getattr(session_info, 'name', ''),
                 'intake': getattr(session_info, 'intake', ''),
@@ -564,6 +629,8 @@ Lead ID: {lead.get('id', 'N/A')}
         
         # Add enhanced context sections
         enhanced_context = f"""
+{existing_lead_data}
+
 {conversation_context}
 
 {session_context}

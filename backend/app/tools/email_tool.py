@@ -249,6 +249,14 @@ class EmailTool:
                 <td style="padding: 12px; border: 1px solid #dee2e6;">{lead_data.get('intake', 'N/A')}</td>
             </tr>
             <tr>
+                <td style="padding: 12px; border: 1px solid #dee2e6; font-weight: bold;">Study Level</td>
+                <td style="padding: 12px; border: 1px solid #dee2e6;">{lead_data.get('study_level', 'N/A')}</td>
+            </tr>
+            <tr style="background-color: #f8f9fa;">
+                <td style="padding: 12px; border: 1px solid #dee2e6; font-weight: bold;">Program</td>
+                <td style="padding: 12px; border: 1px solid #dee2e6;">{lead_data.get('program', 'N/A')}</td>
+            </tr>
+            <tr>
                 <td style="padding: 12px; border: 1px solid #dee2e6; font-weight: bold;">Session ID</td>
                 <td style="padding: 12px; border: 1px solid #dee2e6;">{lead_data.get('session_id', 'N/A')}</td>
             </tr>

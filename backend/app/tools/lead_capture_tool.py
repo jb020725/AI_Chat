@@ -139,40 +139,14 @@ class LeadCaptureTool:
                     lead_data = result.data[0]
                     logger.info(f"Lead created successfully with ID: {lead_id}")
                     
-                    # Send email notification (with timeout protection)
-                    email_result = {"success": False, "error": "Email not attempted"}
-                    try:
-                        logger.info(f"📧 LEAD CAPTURE DEBUG: About to send email notification for lead {lead_id}")
-                        logger.info(f"📧 LEAD CAPTURE DEBUG: Lead data: {lead_data}")
-                        logger.info(f"📧 LEAD CAPTURE DEBUG: Email tool config: {self.email_tool.config if hasattr(self.email_tool, 'config') else 'NO CONFIG'}")
-                        
-                        # Skip email for test sessions to improve performance
-                        if not any(skip_word in lead_data.get("session_id", "").lower() for skip_word in ["test", "debug", "diagnostic"]):
-                            logger.info(f"📧 LEAD CAPTURE DEBUG: Not a test session, sending email...")
-                            email_result = self.email_tool.send_lead_notification(
-                                lead_data=lead_data,
-                                conversation_context=self.config.get("conversation_context")
-                            )
-                            logger.info(f"📧 LEAD CAPTURE DEBUG: Email result: {email_result}")
-                            if email_result["success"]:
-                                logger.info("Lead notification email sent successfully")
-                            else:
-                                logger.warning(f"Failed to send lead notification email: {email_result.get('error')}")
-                        else:
-                            logger.info("Skipping email notification for test session")
-                            email_result = {"success": True, "message": "Email skipped for test session"}
-                    except Exception as e:
-                        logger.error(f"📧 LEAD CAPTURE DEBUG: Error sending lead notification email: {str(e)}")
-                        logger.error(f"📧 LEAD CAPTURE DEBUG: Exception type: {type(e)}")
-                        import traceback
-                        logger.error(f"📧 LEAD CAPTURE DEBUG: Traceback: {traceback.format_exc()}")
+                    # ✅ NEW SYSTEM: Email will be sent when session closes, not here
+                    logger.info(f"📧 LEAD CREATED: Email will be sent when session closes for lead {lead_id}")
                     
                     return {
                         "success": True,
                         "lead_id": lead_id,
                         "lead_data": lead_data,
-                        "message": "Lead created successfully",
-                        "email_sent": email_result.get("success", False) if 'email_result' in locals() else False
+                        "message": "Lead created successfully - email pending until session close"
                     }
                 else:
                     logger.error("Failed to create lead - no data returned")
@@ -258,6 +232,109 @@ class LeadCaptureTool:
                 "success": False,
                 "error": str(e),
                 "fallback_data": update_data
+            }
+    
+    def close_session_and_send_email(self, session_id: str) -> Dict[str, Any]:
+        """
+        Close a session and send comprehensive email with all leads from that session.
+        This is the ONLY place where emails are sent for leads.
+        
+        Args:
+            session_id: Session ID to close
+            
+        Returns:
+            Dictionary with operation result
+        """
+        try:
+            logger.info(f"📧 SESSION CLOSE: Closing session {session_id} and sending email")
+            
+            # Get all leads for this session
+            leads_result = self.get_leads_by_session(session_id)
+            
+            if not leads_result.get('success'):
+                logger.warning(f"📧 SESSION CLOSE: No leads found for session {session_id}")
+                return {
+                    "success": True,
+                    "message": "Session closed - no leads to email",
+                    "email_sent": False
+                }
+            
+            leads = leads_result.get('data', [])
+            if not leads:
+                logger.info(f"📧 SESSION CLOSE: No leads found for session {session_id}")
+                return {
+                    "success": True,
+                    "message": "Session closed - no leads to email",
+                    "email_sent": False
+                }
+            
+            logger.info(f"📧 SESSION CLOSE: Found {len(leads)} leads for session {session_id}")
+            
+            # Skip email for test sessions
+            if any(skip_word in session_id.lower() for skip_word in ["test", "debug", "diagnostic"]):
+                logger.info(f"📧 SESSION CLOSE: Test session {session_id} - skipping email")
+                return {
+                    "success": True,
+                    "message": "Session closed - test session, email skipped",
+                    "email_sent": False
+                }
+            
+            # Send comprehensive email with all leads from this session
+            try:
+                # Use the first lead as the primary data, but include all leads info
+                primary_lead = leads[0]
+                
+                # Add session summary to conversation context
+                session_summary = f"Session {session_id} closed with {len(leads)} lead(s). "
+                if len(leads) > 1:
+                    session_summary += f"Multiple leads were captured during this session."
+                else:
+                    session_summary += f"Single lead captured during this session."
+                
+                # Send the email
+                email_result = self.email_tool.send_lead_notification(
+                    lead_data=primary_lead,
+                    conversation_context=session_summary
+                )
+                
+                if email_result.get("success"):
+                    logger.info(f"📧 SESSION CLOSE: Email sent successfully for session {session_id} with {len(leads)} leads")
+                    return {
+                        "success": True,
+                        "message": f"Session closed and email sent with {len(leads)} leads",
+                        "email_sent": True,
+                        "leads_count": len(leads),
+                        "session_id": session_id
+                    }
+                else:
+                    logger.error(f"📧 SESSION CLOSE: Failed to send email for session {session_id}: {email_result.get('error')}")
+                    return {
+                        "success": False,
+                        "error": f"Failed to send email: {email_result.get('error')}",
+                        "email_sent": False,
+                        "leads_count": len(leads),
+                        "session_id": session_id
+                    }
+                    
+            except Exception as e:
+                logger.error(f"📧 SESSION CLOSE: Error sending email for session {session_id}: {str(e)}")
+                import traceback
+                logger.error(f"📧 SESSION CLOSE: Traceback: {traceback.format_exc()}")
+                return {
+                    "success": False,
+                    "error": f"Email error: {str(e)}",
+                    "email_sent": False,
+                    "leads_count": len(leads),
+                    "session_id": session_id
+                }
+                
+        except Exception as e:
+            logger.error(f"📧 SESSION CLOSE: Error in close_session_and_send_email: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "email_sent": False,
+                "session_id": session_id
             }
     
     def get_lead_by_id(self, lead_id: str) -> Dict[str, Any]:
