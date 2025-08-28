@@ -206,6 +206,14 @@ async def lifespan(app: FastAPI):
 # FastAPI app
 app = FastAPI(title="AI Consultancy AI Assistant - Simple Chatbot", version="3.0.0", lifespan=lifespan)
 
+@app.on_event("startup")
+async def startup_event():
+    """Log startup information"""
+    logger.info("🚀 FastAPI app starting up...")
+    logger.info(f"🌐 App will listen on port: {os.getenv('PORT', '8080')}")
+    logger.info(f"🔧 Environment: {os.getenv('ENVIRONMENT', 'development')}")
+    logger.info("✅ FastAPI app startup completed!")
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -546,13 +554,19 @@ if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
 else:
     logger.warning("Memory system or LLM not available for clean function calling integration")
 
+# Add startup logging for debugging
+logger.info("🚀 Backend startup sequence completed successfully!")
+logger.info(f"📊 System Status: MEMORY={MEMORY_AVAILABLE}, GEMINI={GEMINI_AVAILABLE}, TELEGRAM={TELEGRAM_AVAILABLE}")
+logger.info(f"🌐 App will listen on port: {os.getenv('PORT', '8080')}")
+logger.info("✅ All systems ready - FastAPI app should start successfully")
+
 if __name__ == "__main__":
     # Run the FastAPI app
     logger.info("AI Chatbot started with ENHANCED EXTRACTION VERSION 2.0! - FORCE DEPLOYMENT")
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=int(os.getenv("PORT", 8000)),
+        port=int(os.getenv("PORT", 8080)),
         reload=False,  # Disable reload to stop file watching spam
         log_level="info"
     )
