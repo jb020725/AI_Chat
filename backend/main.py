@@ -33,56 +33,128 @@ from slowapi.errors import RateLimitExceeded
 # Add current directory to path for imports
 sys.path.append('.')
 
-# Import centralized utilities
-from app.utils.paths import CFG
-from app.utils.logging_config import setup_clean_logging
-from app.config import settings
+# Safe import wrapper function
+def safe_import(module_name: str, fallback=None):
+    """Safely import modules with fallback"""
+    try:
+        module = __import__(module_name)
+        return module
+    except Exception as e:
+        print(f"⚠️ Warning: Could not import {module_name}: {e}")
+        return fallback
 
-# Import Telegram integration
+# Import centralized utilities with safe fallback
+try:
+    from app.utils.paths import CFG
+    from app.utils.logging_config import setup_clean_logging
+    PATHS_AVAILABLE = True
+    LOGGING_AVAILABLE = True
+except Exception as e:
+    print(f"⚠️ Warning: Core utilities not available: {e}")
+    PATHS_AVAILABLE = False
+    LOGGING_AVAILABLE = False
+    # Create minimal fallback
+    class MinimalCFG:
+        APP_DIR = Path(".")
+        DATA_DIR = Path(".")
+        INDEX_DIR = Path(".")
+        LOGS_DIR = Path(".")
+        BACKEND_ROOT = Path(".")
+        CONFIG_DIR = Path(".")
+    CFG = MinimalCFG()
+
+# Import configuration with safe fallback
+try:
+    from app.config import settings
+    CONFIG_AVAILABLE = True
+except Exception as e:
+    print(f"⚠️ Warning: Configuration not available: {e}")
+    CONFIG_AVAILABLE = False
+    # Create minimal settings for basic functionality
+    class MinimalSettings:
+        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+        SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+        SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+        SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+        ENABLE_TELEGRAM = os.getenv("ENABLE_TELEGRAM", "false").lower() == "true"
+        TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+        TELEGRAM_WEBHOOK_URL = os.getenv("TELEGRAM_WEBHOOK_URL", "")
+        WEBHOOK_BASE_URL = os.getenv("WEBHOOK_BASE_URL", "")
+        SMTP_SERVER = os.getenv("SMTP_SERVER", "")
+        SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+        SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
+        SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+        FROM_EMAIL = os.getenv("FROM_EMAIL", "")
+        FROM_NAME = os.getenv("FROM_NAME", "Visa Consultation Bot")
+        LEAD_NOTIFICATION_EMAIL = os.getenv("LEAD_NOTIFICATION_EMAIL", "")
+        ENABLE_EMAIL_NOTIFICATIONS = os.getenv("ENABLE_EMAIL_NOTIFICATIONS", "true").lower() == "true"
+        ENABLE_LEAD_NOTIFICATIONS = os.getenv("ENABLE_LEAD_NOTIFICATIONS", "true").lower() == "true"
+    settings = MinimalSettings()
+
+# Import Telegram integration with safe fallback
 try:
     from telegram_integration import telegram_router
     TELEGRAM_AVAILABLE = True
     print("✅ Telegram integration loaded successfully")
-except ImportError as e:
-    print(f"❌ Telegram integration not available: {e}")
+except Exception as e:
+    print(f"⚠️ Warning: Telegram integration not available: {e}")
     TELEGRAM_AVAILABLE = False
+    # Create minimal router for graceful degradation
+    from fastapi import APIRouter
+    telegram_router = APIRouter()
 
 # RAG components have been completely removed
 RAG_AVAILABLE = False
 RAG_ENABLED = False
 
-# Import Memory Management components
+# Import Memory Management components with safe fallback
 try:
     from app.memory import get_session_memory, get_smart_response
     from app.memory.api import router as memory_router
     MEMORY_AVAILABLE = True
-except ImportError as e:
-    print(f"Memory system not available: {e}")
+except Exception as e:
+    print(f"⚠️ Warning: Memory system not available: {e}")
     MEMORY_AVAILABLE = False
+    # Create minimal fallback functions
+    def get_session_memory():
+        return None
+    def get_smart_response():
+        return None
+    from fastapi import APIRouter
+    memory_router = APIRouter()
 
-# Import Lead Capture Tool
+# Import Lead Capture Tool with safe fallback
 try:
     from app.tools.lead_capture_tool import LeadCaptureTool
     LEAD_CAPTURE_AVAILABLE = True
-except ImportError as e:
-    print(f"Lead capture tool not available: {e}")
+except Exception as e:
+    print(f"⚠️ Warning: Lead capture tool not available: {e}")
     LEAD_CAPTURE_AVAILABLE = False
+    LeadCaptureTool = None
 
-# Import Gemini AI
+# Import Gemini AI with safe fallback
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
-except ImportError as e:
-    print(f"Gemini not available: {e}")
+except Exception as e:
+    print(f"⚠️ Warning: Gemini not available: {e}")
     GEMINI_AVAILABLE = False
+    genai = None
 
-# Configure clean logging with rotation
-setup_clean_logging(
-    log_level="INFO",
-    max_size_mb=10,  # 10MB max file size
-    backup_count=5    # Keep 5 backup files
-)
-logger = logging.getLogger(__name__)
+# Configure clean logging with rotation - safe fallback
+try:
+    if LOGGING_AVAILABLE:
+        setup_clean_logging(
+            log_level="INFO",
+            max_size_mb=10,  # 10MB max file size
+            backup_count=5    # Keep 5 backup files
+        )
+    logger = logging.getLogger(__name__)
+except Exception as e:
+    print(f"⚠️ Warning: Advanced logging not available: {e}")
+    # Basic logging fallback
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
 # Initialize Rate Limiting
 limiter = Limiter(key_func=get_remote_address)
@@ -90,23 +162,32 @@ logger.info("Rate limiting initialized")
 
 # Environment variables are loaded from Cloud Run via app.config.settings
 
-# Initialize Gemini
-if GEMINI_AVAILABLE:
-    genai.configure(api_key=settings.GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.5-flash')
-    logger.info("Gemini 2.5 Flash initialized for AI Consultancy chatbot")
+# Initialize Gemini with safe fallback
+model = None
+if GEMINI_AVAILABLE and hasattr(settings, 'GEMINI_API_KEY') and settings.GEMINI_API_KEY:
+    try:
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        logger.info("✅ Gemini 2.5 Flash initialized for AI Consultancy chatbot")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize Gemini: {e}")
+        GEMINI_AVAILABLE = False
+        model = None
 else:
-    model = None
+    logger.warning("⚠️ Gemini not available - API key missing or system unavailable")
 
-# Initialize Lead Capture Tool
+# Initialize Lead Capture Tool with safe fallback
 lead_capture_tool = None
-if LEAD_CAPTURE_AVAILABLE:
+if LEAD_CAPTURE_AVAILABLE and LeadCaptureTool:
     try:
         lead_capture_tool = LeadCaptureTool()
-        logger.info("Lead Capture Tool initialized successfully")
+        logger.info("✅ Lead Capture Tool initialized successfully")
     except Exception as e:
-        logger.error(f"Failed to initialize Lead Capture Tool: {e}")
+        logger.error(f"❌ Failed to initialize Lead Capture Tool: {e}")
         LEAD_CAPTURE_AVAILABLE = False
+        lead_capture_tool = None
+else:
+    logger.warning("⚠️ Lead Capture Tool not available")
 
 # Concurrency Control - Updated for Gemini 2.5 Flash
 llm_semaphore = asyncio.Semaphore(20)  # Max 20 concurrent LLM calls (doubled for 2.5)
@@ -531,34 +612,74 @@ async def test_lead_creation(test_data: dict):
             "error": f"Test lead creation failed: {str(e)}"
         }
 
-# Initialize Memory System with LLM model (Clean Function Calling)
-if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
-    try:
-        # Initialize the smart response system for simple chatbot
-        logger.info("About to set LLM model in smart response system...")
-        get_smart_response().set_llm_model(model)
-        logger.info("Memory system initialized with LLM model for simple chatbot")
-        
-        # Verify the integration
-        smart_response_instance = get_smart_response()
-        if smart_response_instance.llm_model:
-            logger.info("Simple chatbot successfully connected to smart response system")
-        else:
-            logger.error("Simple chatbot failed to connect to smart response system")
-            logger.error(f"LLM model status: {smart_response_instance.llm_model}")
-            
-    except Exception as e:
-        logger.error(f"Failed to initialize memory system with LLM: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-else:
-    logger.warning("Memory system or LLM not available for clean function calling integration")
+# Initialize Memory System with LLM model (Clean Function Calling) - Safe initialization
+def initialize_memory_system():
+    """Initialize memory system safely"""
+    global MEMORY_AVAILABLE, GEMINI_AVAILABLE
+    
+    if MEMORY_AVAILABLE and GEMINI_AVAILABLE and get_smart_response:
+        try:
+            # Initialize the smart response system for simple chatbot
+            logger.info("🔄 About to set LLM model in smart response system...")
+            smart_response_instance = get_smart_response()
+            if smart_response_instance:
+                smart_response_instance.set_llm_model(model)
+                logger.info("✅ Memory system initialized with LLM model for simple chatbot")
+                
+                # Verify the integration
+                if smart_response_instance.llm_model:
+                    logger.info("✅ Simple chatbot successfully connected to smart response system")
+                else:
+                    logger.error("❌ Simple chatbot failed to connect to smart response system")
+                    logger.error(f"LLM model status: {smart_response_instance.llm_model}")
+            else:
+                logger.warning("⚠️ Smart response instance not available")
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize memory system with LLM: {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            MEMORY_AVAILABLE = False
+    else:
+        logger.warning("⚠️ Memory system or LLM not available for clean function calling integration")
+
+# Call initialization function
+initialize_memory_system()
 
 # Add startup logging for debugging
 logger.info("🚀 Backend startup sequence completed successfully!")
 logger.info(f"📊 System Status: MEMORY={MEMORY_AVAILABLE}, GEMINI={GEMINI_AVAILABLE}, TELEGRAM={TELEGRAM_AVAILABLE}")
 logger.info(f"🌐 App will listen on port: {os.getenv('PORT', '8080')}")
 logger.info("✅ All systems ready - FastAPI app should start successfully")
+
+# Add system health check
+def check_system_health():
+    """Check system health and log status"""
+    health_status = {
+        "config_available": CONFIG_AVAILABLE,
+        "paths_available": PATHS_AVAILABLE,
+        "logging_available": LOGGING_AVAILABLE,
+        "telegram_available": TELEGRAM_AVAILABLE,
+        "memory_available": MEMORY_AVAILABLE,
+        "lead_capture_available": LEAD_CAPTURE_AVAILABLE,
+        "gemini_available": GEMINI_AVAILABLE,
+        "model_available": model is not None
+    }
+    
+    logger.info(f"🏥 System Health Check: {health_status}")
+    
+    # Log any critical issues
+    if not CONFIG_AVAILABLE:
+        logger.warning("⚠️ CRITICAL: Configuration system not available")
+    if not GEMINI_AVAILABLE:
+        logger.warning("⚠️ CRITICAL: Gemini AI not available")
+    if not MEMORY_AVAILABLE:
+        logger.warning("⚠️ CRITICAL: Memory system not available")
+    
+    return health_status
+
+# Run health check
+system_health = check_system_health()
 
 if __name__ == "__main__":
     # Run the FastAPI app
