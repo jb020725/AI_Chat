@@ -248,3 +248,5 @@ app.include_router(telegram_router)
 # Your Telegram webhook will be available at:
 # https://your-backend-url.com/telegram/webhook
 """
+#   F o r c e   r e d e p l o y   -   0 8 / 2 8 / 2 0 2 5   1 8 : 4 7 : 4 1  
+ 
