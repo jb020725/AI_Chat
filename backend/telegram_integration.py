@@ -10,12 +10,17 @@ from typing import Dict, Any, Optional
 import logging
 import json
 from datetime import datetime
+import time
+from collections import defaultdict
 
 # Import your existing systems (SAME AS WEB)
 from app.memory.smart_response import get_smart_response
 from app.memory import get_session_memory
 
 logger = logging.getLogger(__name__)
+
+# Track users waiting for responses (prevent double question sending)
+users_waiting_for_response = set()
 
 # Telegram message models
 class TelegramMessage(BaseModel):
@@ -35,6 +40,36 @@ telegram_router = APIRouter(prefix="/telegram", tags=["telegram"])
 def create_telegram_session_id(user_id: int) -> str:
     """Create a session ID for Telegram users"""
     return f"telegram_{user_id}"
+
+async def send_typing_action(chat_id: int) -> None:
+    """Send typing indicator to show bot is working"""
+    try:
+        import requests
+        
+        # Get bot token from environment
+        from app.config import settings
+        bot_token = settings.TELEGRAM_BOT_TOKEN
+        
+        if not bot_token:
+            logger.warning("No bot token available for typing indicator")
+            return
+        
+        # Send typing action
+        typing_url = f"https://api.telegram.org/bot{bot_token}/sendChatAction"
+        typing_data = {
+            "chat_id": chat_id,
+            "action": "typing"
+        }
+        
+        response = requests.post(typing_url, json=typing_data, timeout=5)
+        
+        if response.status_code == 200:
+            logger.debug(f"✅ Typing indicator sent to chat {chat_id}")
+        else:
+            logger.warning(f"⚠️ Failed to send typing indicator: {response.status_code}")
+            
+    except Exception as e:
+        logger.warning(f"⚠️ Error sending typing indicator: {e}")
 
 def format_telegram_response(text: str) -> Dict[str, Any]:
     """Format response for Telegram"""
@@ -72,7 +107,22 @@ async def telegram_webhook(request: Request):
         text = message.text
         session_id = create_telegram_session_id(user_id)
         
+        # Check if user is already waiting for a response
+        if user_id in users_waiting_for_response:
+            logger.info(f"⏳ User {user_id} already waiting for response - ignoring message")
+            return {"ok": True}  # Ignore message, don't respond
+        
+        # Mark user as waiting for response
+        users_waiting_for_response.add(user_id)
+        
         logger.info(f"📱 Telegram message from user {user_id}: {text}")
+        
+        # Send typing indicator to show bot is working
+        try:
+            await send_typing_action(chat_id)
+            logger.info(f"⌨️ Sent typing indicator to user {user_id}")
+        except Exception as typing_error:
+            logger.warning(f"⚠️ Failed to send typing indicator: {typing_error}")
         
         # Get conversation history for this user (SAME AS WEB)
         memory = get_session_memory()
@@ -90,6 +140,17 @@ async def telegram_webhook(request: Request):
             ai_response = result.get('response', '')
             logger.info(f"🤖 AI Response: {ai_response[:100]}...")
             
+            # IMPORTANT: Save conversation exchange to memory for persistence
+            try:
+                memory.add_conversation_exchange(session_id, text, ai_response)
+                logger.info(f"💾 Conversation saved to memory for session {session_id}")
+            except Exception as mem_error:
+                logger.warning(f"⚠️ Failed to save conversation to memory: {mem_error}")
+            
+            # Remove user from waiting list - they can now send another message
+            users_waiting_for_response.discard(user_id)
+            logger.info(f"✅ User {user_id} can now send another message")
+            
             # Format response for Telegram
             telegram_response = format_telegram_response(ai_response)
             telegram_response["chat_id"] = chat_id
@@ -98,10 +159,17 @@ async def telegram_webhook(request: Request):
             return telegram_response
         else:
             logger.error(f"❌ Smart response failed: {result.get('error')}")
+            # Remove user from waiting list even on error
+            users_waiting_for_response.discard(user_id)
+            logger.info(f"✅ User {user_id} removed from waiting list due to error")
             return format_telegram_response("I'm experiencing technical difficulties. Please try again.")
             
     except Exception as e:
         logger.error(f"❌ Telegram webhook error: {e}")
+        # Remove user from waiting list on any exception
+        if 'user_id' in locals():
+            users_waiting_for_response.discard(user_id)
+            logger.info(f"✅ User {user_id} removed from waiting list due to exception")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @telegram_router.get("/set-webhook")
