@@ -5,7 +5,7 @@ This shows how easy it is to integrate Telegram with your existing system.
 """
 
 from fastapi import APIRouter, Request, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 import logging
 import json
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # Telegram message models
 class TelegramMessage(BaseModel):
     message_id: int
-    from_user: Dict[str, Any]
+    from_: Dict[str, Any] = Field(alias="from")  # Telegram sends "from", not "from_user"
     chat: Dict[str, Any]
     text: Optional[str] = None
     date: int
@@ -67,7 +67,7 @@ async def telegram_webhook(request: Request):
             return {"ok": True}
         
         message = update.message
-        user_id = message.from_user["id"]
+        user_id = message.from_["id"]  # Use from_ instead of from_user
         chat_id = message.chat["id"]
         text = message.text
         session_id = create_telegram_session_id(user_id)
