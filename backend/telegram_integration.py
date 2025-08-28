@@ -13,9 +13,19 @@ from datetime import datetime
 import time
 from collections import defaultdict
 
-# Import your existing systems (SAME AS WEB)
-from app.memory.smart_response import get_smart_response
-from app.memory import get_session_memory
+# Import your existing systems (SAME AS WEB) - with safe fallback
+try:
+    from app.memory.smart_response import get_smart_response
+    from app.memory import get_session_memory
+    MEMORY_IMPORTS_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ Warning: Memory imports not available: {e}")
+    MEMORY_IMPORTS_AVAILABLE = False
+    # Create fallback functions
+    def get_smart_response():
+        return None
+    def get_session_memory():
+        return None
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +57,12 @@ async def send_typing_action(chat_id: int) -> None:
         import requests
         
         # Get bot token from environment
-        from app.config import settings
-        bot_token = settings.TELEGRAM_BOT_TOKEN
+        try:
+            from app.config import settings
+            bot_token = settings.TELEGRAM_BOT_TOKEN
+        except ImportError:
+            import os
+            bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
         
         if not bot_token:
             logger.warning("No bot token available for typing indicator")
@@ -78,17 +92,9 @@ def format_telegram_response(text: str) -> Dict[str, Any]:
         "chat_id": None,  # Will be set by the calling function
         "text": text,
         "parse_mode": "HTML",  # Support basic HTML formatting
-        "reply_markup": {
-            "keyboard": [
-                [{"text": "🇺🇸 USA Visa"}],
-                [{"text": "🇬🇧 UK Visa"}],
-                [{"text": "🇦🇺 Australia Visa"}],
-                [{"text": "🇰🇷 South Korea Visa"}]
-            ],
-            "resize_keyboard": True,
-            "one_time_keyboard": False
-        }
+
     }
+    
 
 @telegram_router.post("/webhook")
 async def telegram_webhook(request: Request):
@@ -125,27 +131,51 @@ async def telegram_webhook(request: Request):
             logger.warning(f"⚠️ Failed to send typing indicator: {typing_error}")
         
         # Get conversation history for this user (SAME AS WEB)
-        memory = get_session_memory()
-        conversation_context = memory.get_conversation_context(session_id)
-        conversation_history = conversation_context.get("conversation_history", [])
+        conversation_history = []
+        if MEMORY_IMPORTS_AVAILABLE and get_session_memory():
+            try:
+                memory = get_session_memory()
+                conversation_context = memory.get_conversation_context(session_id)
+                conversation_history = conversation_context.get("conversation_history", [])
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to get conversation history: {e}")
         
         # Process message through your existing smart response system
-        result = get_smart_response().generate_smart_response(
-            user_message=text,
-            session_id=session_id,
-            conversation_history=conversation_history
-        )
+        if MEMORY_IMPORTS_AVAILABLE and get_smart_response():
+            try:
+                result = get_smart_response().generate_smart_response(
+                    user_message=text,
+                    session_id=session_id,
+                    conversation_history=conversation_history
+                )
+            except Exception as e:
+                logger.error(f"❌ Smart response failed: {e}")
+                result = {
+                    "success": False,
+                    "error": str(e),
+                    "response": "I'm experiencing technical difficulties. Please try again."
+                }
+        else:
+            # Fallback response if smart response system is not available
+            result = {
+                "success": True,
+                "response": "Hello! I'm your AI visa consultant. How can I help you with student visa information for USA, UK, Australia, or South Korea?"
+            }
         
         if result.get('success'):
             ai_response = result.get('response', '')
             logger.info(f"🤖 AI Response: {ai_response[:100]}...")
             
             # IMPORTANT: Save conversation exchange to memory for persistence
-            try:
-                memory.add_conversation_exchange(session_id, text, ai_response)
-                logger.info(f"💾 Conversation saved to memory for session {session_id}")
-            except Exception as mem_error:
-                logger.warning(f"⚠️ Failed to save conversation to memory: {mem_error}")
+            if MEMORY_IMPORTS_AVAILABLE and get_session_memory():
+                try:
+                    memory = get_session_memory()
+                    memory.add_conversation_exchange(session_id, text, ai_response)
+                    logger.info(f"💾 Conversation saved to memory for session {session_id}")
+                except Exception as mem_error:
+                    logger.warning(f"⚠️ Failed to save conversation to memory: {mem_error}")
+            else:
+                logger.info(f"💾 Memory system not available - skipping conversation save")
             
             # Remove user from waiting list - they can now send another message
             users_waiting_for_response.discard(user_id)
@@ -248,5 +278,3 @@ app.include_router(telegram_router)
 # Your Telegram webhook will be available at:
 # https://your-backend-url.com/telegram/webhook
 """
-#   F o r c e   r e d e p l o y   -   0 8 / 2 8 / 2 0 2 5   1 8 : 4 7 : 4 1  
- 
