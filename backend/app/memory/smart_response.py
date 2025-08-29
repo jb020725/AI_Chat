@@ -74,23 +74,30 @@ class SmartResponse:
                 contact_extraction_future = executor.submit(
                     self._extract_contact_info_parallel, user_message
                 )
+                
+                # Wait for contact extraction to complete first
+                contact_info = contact_extraction_future.result()
+                
+                # ✅ CRITICAL FIX: Update session memory BEFORE LLM response generation
+                # This ensures LLM gets fresh, updated data
+                if contact_info:
+                    self._update_session_memory_with_contact_info(session_id, contact_info)
+                    logger.info(f"🔍 Session memory updated BEFORE LLM call with: {contact_info}")
+                
+                # Now generate response with updated session data
                 response_generation_future = executor.submit(
                     self._generate_response_parallel, user_message, session_id, conversation_history
                 )
-                
-                # Wait for both to complete (they run in parallel)
-                contact_info = contact_extraction_future.result()
                 ai_response = response_generation_future.result()
             
             logger.info(f"🔍 PARALLEL PROCESSING COMPLETE: Contact info extracted, response generated")
             logger.info(f"🔍 Contact info extracted: {contact_info}")
             
-            # ✅ BACKGROUND DATABASE OPERATIONS: Start DB operations in background (don't wait)
-            # This makes responses faster while maintaining data integrity
-            # Use a separate thread pool for background operations to avoid blocking
+            # ✅ BACKGROUND DATABASE OPERATIONS: Only lead saving and conversation tracking in background
+            # Session memory is already updated above, so LLM had fresh data
             import threading
             background_thread = threading.Thread(
-                target=self._background_database_operations,
+                target=self._background_database_operations_optimized,
                 args=(session_id, contact_info, user_message, ai_response),
                 daemon=True  # Daemon thread so it doesn't block shutdown
             )
@@ -140,6 +147,31 @@ class SmartResponse:
             
         except Exception as e:
             logger.error(f"❌ Background database operations failed: {e}")
+            import traceback
+            logger.error(f"❌ Background operations traceback: {traceback.format_exc()}")
+    
+    def _background_database_operations_optimized(self, session_id: str, contact_info: Dict[str, str], user_message: str, ai_response: str):
+        """Run optimized background operations - session memory already updated above"""
+        try:
+            logger.info(f"🚀 OPTIMIZED BACKGROUND DB OPERATIONS STARTED for session {session_id}")
+            
+            # ✅ Session memory already updated above, so only do these in background:
+            
+            # 1. Update session memory with conversation exchange
+            self._update_session_memory_with_exchange(session_id, user_message, ai_response)
+            logger.info(f"✅ Background: Conversation exchange tracked")
+            
+            # 2. Detect and save lead (this includes database operations)
+            lead_saved = self._detect_and_save_lead(user_message, session_id, contact_info)
+            if lead_saved:
+                logger.info(f"✅ Background: Lead saved/updated successfully")
+            else:
+                logger.info(f"ℹ️ Background: No lead action needed")
+            
+            logger.info(f"✅ OPTIMIZED BACKGROUND DB OPERATIONS COMPLETED for session {session_id}")
+            
+        except Exception as e:
+            logger.error(f"❌ Optimized background database operations failed: {e}")
             import traceback
             logger.error(f"❌ Background operations traceback: {traceback.format_exc()}")
 

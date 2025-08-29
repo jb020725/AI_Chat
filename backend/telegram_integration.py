@@ -118,6 +118,20 @@ async def telegram_webhook(request: Request):
             logger.info(f"⏳ User {user_id} already waiting for response - ignoring message")
             return {"ok": True}  # Ignore message, don't respond
         
+        # Check if this is a duplicate message (same text, same user, within 5 seconds)
+        current_time = time.time()
+        message_key = f"{user_id}_{text}"
+        if hasattr(telegram_webhook, 'recent_messages') and message_key in telegram_webhook.recent_messages:
+            last_time = telegram_webhook.recent_messages[message_key]
+            if current_time - last_time < 5:  # Within 5 seconds
+                logger.info(f"⏳ Duplicate message detected for user {user_id} within 5 seconds - ignoring")
+                return {"ok": True}
+        
+        # Store this message to prevent duplicates
+        if not hasattr(telegram_webhook, 'recent_messages'):
+            telegram_webhook.recent_messages = {}
+        telegram_webhook.recent_messages[message_key] = current_time
+        
         # Mark user as waiting for response
         users_waiting_for_response.add(user_id)
         
@@ -141,7 +155,7 @@ async def telegram_webhook(request: Request):
                 logger.warning(f"⚠️ Failed to get conversation history: {e}")
         
         # Check for special commands first
-        if text.lower().strip() in ["delete history", "clear history", "reset", "start over"]:
+        if text.lower().strip() in ["delete history", "clear history", "reset", "start over", "delete my data", "delete data", "clear data", "remove data"]:
             # Force delete all session data for this user
             if MEMORY_IMPORTS_AVAILABLE and get_session_memory():
                 try:
@@ -190,27 +204,31 @@ async def telegram_webhook(request: Request):
                     "response": "Your session has been refreshed. How can I help you with student visa information?"
                 }
         else:
-            # Process message through your existing smart response system
-            if MEMORY_IMPORTS_AVAILABLE and get_smart_response():
-                try:
-                    result = get_smart_response().generate_smart_response(
-                        user_message=text,
-                        session_id=session_id,
-                        conversation_history=conversation_history
-                    )
-                except Exception as e:
-                    logger.error(f"❌ Smart response failed: {e}")
-                    result = {
-                        "success": False,
-                        "error": str(e),
-                        "response": "I'm experiencing technical difficulties. Please try again."
-                    }
-            else:
-                # Fallback response if smart response system is not available
+                    # Process message through your existing smart response system
+        logger.info(f"🔍 Processing message through smart response system...")
+        if MEMORY_IMPORTS_AVAILABLE and get_smart_response():
+            try:
+                logger.info(f"🔍 Smart response system available, calling generate_smart_response...")
+                result = get_smart_response().generate_smart_response(
+                    user_message=text,
+                    session_id=session_id,
+                    conversation_history=conversation_history
+                )
+                logger.info(f"🔍 Smart response result: {result}")
+            except Exception as e:
+                logger.error(f"❌ Smart response failed: {e}")
                 result = {
-                    "success": True,
+                    "success": False,
+                    "error": str(e),
                     "response": "I'm experiencing technical difficulties. Please try again."
                 }
+        else:
+            # Fallback response if smart response system is not available
+            logger.warning(f"⚠️ Smart response system not available, using fallback")
+            result = {
+                "success": True,
+                "response": "I'm experiencing technical difficulties. Please try again."
+            }
         
         if result.get('success'):
             ai_response = result.get('response', '')
