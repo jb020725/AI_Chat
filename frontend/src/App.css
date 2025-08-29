@@ -5,28 +5,32 @@
   padding: 0;
   text-align: left;
   height: 100vh;
+  height: 100dvh; /* Use dynamic viewport height for mobile */
   overflow: hidden;
 }
 
 /* Mobile-first responsive design */
 @media (max-width: 640px) {
   .chat-container {
-    padding: 0.5rem;
+    padding: 0.25rem; /* Reduced padding for mobile */
   }
   
   .message-bubble {
-    max-width: 95%;
+    max-width: 98%; /* Use more screen width on mobile */
     font-size: 0.875rem;
-    line-height: 1.4;
+    line-height: 1.5; /* Better readability on mobile */
+    margin-bottom: 0.75rem; /* Reduced spacing */
   }
   
   .input-container {
-    padding: 0.75rem;
+    padding: 0.5rem; /* Reduced padding for mobile */
   }
   
   .send-button {
-    height: 2.75rem;
-    width: 2.75rem;
+    height: 3rem; /* Larger touch target */
+    width: 3rem;
+    min-height: 48px; /* iOS minimum touch target */
+    min-width: 48px;
   }
 }
 
@@ -77,16 +81,30 @@
   transition: all 400ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Mobile touch optimizations */
+/* Mobile touch optimizations - Enhanced */
 @media (hover: none) and (pointer: coarse) {
   .send-button {
-    min-height: 44px;
-    min-width: 44px;
+    min-height: 48px; /* iOS minimum touch target */
+    min-width: 48px;
+    border-radius: 12px; /* Better touch feel */
   }
   
   .textarea-input {
-    min-height: 44px;
+    min-height: 48px; /* iOS minimum touch target */
     font-size: 16px; /* Prevents zoom on iOS */
+    line-height: 1.4; /* Better mobile readability */
+    padding: 12px 16px; /* Better touch padding */
+  }
+  
+  /* Enhanced touch feedback */
+  .send-button:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+  
+  .textarea-input:active {
+    transform: scale(1.01);
+    transition: transform 0.1s ease;
   }
 }
 
@@ -154,10 +172,11 @@
   -webkit-overflow-scrolling: touch;
 }
 
-/* Mobile keyboard handling - Improved for ChatGPT-like behavior */
+/* Mobile keyboard handling - Enhanced for better UX */
 @media (max-height: 500px) {
   .chat-container {
     height: 100vh;
+    height: 100dvh; /* Dynamic viewport height */
   }
   
   .input-container {
@@ -171,26 +190,6 @@
     padding: 0.75rem;
     box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
   }
-}
-
-/* Input container positioning - Always stays at bottom */
-.input-container {
-  position: sticky;
-  bottom: 0;
-  background: white;
-  z-index: 40;
-  transition: transform 0.3s ease;
-}
-
-/* Prevent auto-pop up behavior */
-.input-container:not(.focused) {
-  transform: translateY(0);
-}
-
-/* Smooth focus transitions */
-.input-container.focused {
-  transform: translateY(0);
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
 }
 
 /* Message bubble animations */
@@ -229,16 +228,10 @@
   }
 }
 
-/* Mobile input focus improvements */
-.mobile-input:focus {
-  transform: scale(1.02);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
 /* Touch target improvements */
 .touch-target {
-  min-height: 44px;
-  min-width: 44px;
+  min-height: 48px; /* iOS minimum */
+  min-width: 48px;
   transition: all 0.2s ease;
 }
 
@@ -246,7 +239,7 @@
   transform: scale(0.95);
 }
 
-/* Prevent viewport jumping on mobile */
+/* Enhanced mobile responsiveness */
 @media (max-width: 768px) {
   .chat-container {
     height: 100vh;
@@ -259,12 +252,29 @@
     bottom: 0;
     background: white;
     z-index: 40;
+    padding: 0.75rem;
   }
   
   /* Ensure smooth scrolling without viewport jumps */
   .scroll-container {
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
+  }
+  
+  /* Better mobile typography */
+  .message-bubble p {
+    font-size: 0.875rem; /* 14px on mobile */
+    line-height: 1.5;
+    letter-spacing: 0.01em; /* Better readability */
+  }
+  
+  /* Optimize header for mobile */
+  .chat-header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .chat-header h1 {
+    font-size: 1.125rem; /* 18px on mobile */
   }
 }
 
@@ -275,9 +285,51 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-/* Prevent auto-zoom on iOS */
+/* Prevent auto-zoom on iOS - Enhanced */
 @media screen and (-webkit-min-device-pixel-ratio: 0) {
   .textarea-input {
     font-size: 16px;
+    transform: scale(1); /* Prevent iOS zoom */
+  }
+}
+
+/* Landscape mobile optimization */
+@media (max-width: 768px) and (orientation: landscape) {
+  .chat-container {
+    height: 100vh;
+    height: 100dvh;
+  }
+  
+  .input-container {
+    padding: 0.5rem 0.75rem; /* Reduced padding in landscape */
+  }
+  
+  .message-bubble {
+    max-width: 95%; /* Use more width in landscape */
+    margin-bottom: 0.5rem; /* Reduced spacing */
+  }
+}
+
+/* High DPI display optimization */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .message-bubble {
+    border-width: 0.5px; /* Thinner borders on high DPI */
+  }
+  
+  .input-container {
+    border-width: 0.5px;
+  }
+}
+
+/* Safe area handling for notched devices */
+@supports (padding: max(0px)) {
+  .input-container {
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+  
+  .chat-container {
+    padding-top: max(0px, env(safe-area-inset-top));
   }
 }

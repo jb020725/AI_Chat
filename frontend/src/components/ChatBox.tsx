@@ -18,7 +18,6 @@ export const ChatBox = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [inputMessage, setInputMessage] = useState("");
-  const [isInputFocused, setIsInputFocused] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -26,7 +25,7 @@ export const ChatBox = () => {
   useEffect(() => {
     const welcomeMessage: Message = {
       id: "welcome",
-      text: "Hello! I'm your professional student visa consultant. I can help you with visa applications for USA, UK, South Korea, and Australia.\n\nYou can ask me about:\n• Visa requirements and documents\n• Application processes and timelines\n• Financial requirements and costs\n• IELTS preparation and booking\n• University admission guidance\n• Interview preparation\n\nWhat country are you interested in studying in?",
+      text: "Hello! I'm your professional student visa consultant. I can help you with visa applications for USA, UK, South Korea, and Australia.",
       isUser: false,
       timestamp: new Date(),
     };
@@ -62,10 +61,9 @@ export const ChatBox = () => {
     setInputMessage("");
     setIsProcessing(true);
 
-    // Keep focus on textarea but don't blur - let user see the response
-    // This prevents the mobile keyboard from disappearing immediately
+    // Hide mobile keyboard by blurring textarea after sending
     if (textareaRef.current) {
-      textareaRef.current.focus();
+      textareaRef.current.blur();
     }
 
     try {
@@ -89,10 +87,6 @@ export const ChatBox = () => {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsProcessing(false);
-      // Keep focus on textarea after response - user can continue typing
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-      }
     }
   };
 
@@ -103,42 +97,22 @@ export const ChatBox = () => {
     }
   };
 
-  const handleInputFocus = () => {
-    setIsInputFocused(true);
-  };
-
-  const handleInputBlur = () => {
-    // Only blur if user explicitly clicks away or navigates
-    // Don't auto-blur after sending messages
-    if (!isProcessing) {
-      setIsInputFocused(false);
-    }
-  };
-
-  const handleInputClick = () => {
-    // Ensure focus when user clicks on the input
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-    }
-    setIsInputFocused(true);
-  };
-
   return (
-    <div className="flex flex-col h-screen bg-white">
-      {/* Header - Clean and minimal */}
-      <div className="flex-none bg-white border-b border-gray-100 px-4 py-3 sm:px-6">
+    <div className="flex flex-col h-screen h-[100dvh] bg-white">
+      {/* Header - Clean and minimal, mobile optimized */}
+      <div className="flex-none bg-white border-b border-gray-100 px-3 py-2.5 sm:px-6 sm:py-3">
         <div className="flex items-center justify-center space-x-2">
-          <div className="w-7 h-7 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-white" />
+          <div className="w-6 h-6 sm:w-7 sm:h-7 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+            <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
           </div>
-          <h1 className="text-lg font-semibold text-gray-900">Student Visa AI</h1>
+          <h1 className="text-base sm:text-lg font-semibold text-gray-900">Student Visa AI</h1>
         </div>
       </div>
 
       {/* Messages - Full width, mobile optimized */}
       <div className="flex-1 overflow-hidden">
         <ScrollArea ref={scrollAreaRef} className="h-full">
-          <div className="px-4 py-4 space-y-4 sm:px-6">
+          <div className="px-3 py-3 space-y-3 sm:px-6 sm:py-4 sm:space-y-4">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -148,12 +122,12 @@ export const ChatBox = () => {
                 )}
               >
                 <div className={cn(
-                  "max-w-[90%] sm:max-w-[80%] lg:max-w-[70%]",
+                  "max-w-[98%] sm:max-w-[90%] lg:max-w-[80%] xl:max-w-[70%]",
                   message.isUser ? "text-right" : "text-left"
                 )}>
                   <div
                     className={cn(
-                      "rounded-2xl px-4 py-3 shadow-sm transition-all duration-300 transform",
+                      "rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3 shadow-sm transition-all duration-300 transform",
                       message.isUser
                         ? "bg-blue-600 text-white ml-auto rounded-br-md animate-in slide-in-from-right-2"
                         : "bg-gray-50 text-gray-900 rounded-bl-md border border-gray-100 animate-in slide-in-from-left-2"
@@ -170,18 +144,18 @@ export const ChatBox = () => {
             {/* Processing indicator - Animated search with movement */}
             {isProcessing && (
               <div className="flex justify-start">
-                <div className="max-w-[90%] sm:max-w-[80%] lg:max-w-[70%]">
-                  <div className="bg-gray-50 rounded-2xl rounded-bl-md px-4 py-3 border border-gray-100 animate-in slide-in-from-left-2 duration-300">
-                    <div className="flex items-center space-x-3 text-gray-600">
+                <div className="max-w-[98%] sm:max-w-[90%] lg:max-w-[80%] xl:max-w-[70%]">
+                  <div className="bg-gray-50 rounded-2xl rounded-bl-md px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-100 animate-in slide-in-from-left-2 duration-300">
+                    <div className="flex items-center space-x-2 sm:space-x-3 text-gray-600">
                       <div className="relative">
-                        <Search className="w-4 h-4 animate-pulse text-blue-500" />
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-ping"></div>
+                        <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-pulse text-blue-500" />
+                        <div className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping"></div>
                       </div>
-                      <span className="text-sm font-medium">Searching for information...</span>
+                      <span className="text-xs sm:text-sm font-medium">Searching for information...</span>
                       <div className="flex space-x-1">
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce delay-100"></div>
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce delay-200"></div>
+                        <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
+                        <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-blue-400 rounded-full animate-bounce delay-100"></div>
+                        <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-blue-400 rounded-full animate-bounce delay-200"></div>
                       </div>
                     </div>
                   </div>
@@ -192,30 +166,24 @@ export const ChatBox = () => {
         </ScrollArea>
       </div>
 
-      {/* Input - Mobile optimized, always enabled, stays at bottom */}
-      <div className="flex-none bg-white border-t border-gray-100 px-4 py-3 sm:px-6">
-        <div className="flex items-end space-x-3">
+      {/* Input - Mobile optimized, always enabled */}
+      <div className="flex-none bg-white border-t border-gray-100 px-3 py-2.5 sm:px-6 sm:py-3">
+        <div className="flex items-end space-x-2 sm:space-x-3">
           <Textarea
             ref={textareaRef}
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            onFocus={handleInputFocus}
-            onBlur={handleInputBlur}
-            onClick={handleInputClick}
-            placeholder="student visas, requirements, application processes, costs, IELTS..."
-            disabled={false} // Always enabled for smooth UX
-            className={cn(
-              "min-h-[44px] max-h-32 resize-none border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm rounded-xl transition-all duration-200 mobile-input",
-              isInputFocused && "ring-2 ring-blue-200"
-            )}
+            placeholder="Ask about student visas, application process, ielts, etc."
+            disabled={false}
+            className="min-h-[48px] max-h-32 resize-none border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm rounded-xl transition-all duration-200 px-3 py-2.5 sm:px-4 sm:py-3"
           />
           <Button
             onClick={handleSendMessage}
             disabled={isProcessing || !inputMessage.trim()}
             size="icon"
             className={cn(
-              "h-11 w-11 shrink-0 rounded-xl transition-all duration-200 touch-target",
+              "h-12 w-12 sm:h-11 sm:w-11 shrink-0 rounded-xl transition-all duration-200 min-h-[48px] min-w-[48px]",
               isProcessing || !inputMessage.trim()
                 ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                 : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md"
