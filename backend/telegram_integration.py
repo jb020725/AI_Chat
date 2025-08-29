@@ -144,17 +144,7 @@ async def telegram_webhook(request: Request):
         except Exception as typing_error:
             logger.warning(f"⚠️ Failed to send typing indicator: {typing_error}")
         
-        # Get conversation history for this user (SAME AS WEB)
-        conversation_history = []
-        if MEMORY_IMPORTS_AVAILABLE and get_session_memory():
-            try:
-                memory = get_session_memory()
-                conversation_context = memory.get_conversation_context(session_id)
-                conversation_history = conversation_context.get("conversation_history", [])
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to get conversation history: {e}")
-        
-        # Check for special commands first
+        # Check for special commands first (BEFORE loading conversation history)
         if text.lower().strip() in ["delete history", "clear history", "reset", "start over", "delete my data", "delete data", "clear data", "remove data"]:
             # Force delete all session data for this user
             if MEMORY_IMPORTS_AVAILABLE and get_session_memory():
@@ -163,6 +153,11 @@ async def telegram_webhook(request: Request):
                     # Force refresh from database and clear
                     memory.clear_session_data(session_id)
                     logger.info(f"🗑️ User {user_id} requested history deletion - session cleared")
+                    
+                    # CRITICAL: Force empty conversation history
+                    conversation_history = []
+                    logger.info(f"🗑️ Conversation history forced empty for session {session_id}")
+                    
                     result = {
                         "success": True,
                         "response": "Your conversation history has been cleared. How can I help you with student visa information?"
@@ -179,6 +174,14 @@ async def telegram_webhook(request: Request):
                     "success": True,
                     "response": "Your conversation history has been cleared. How can I help you with student visa information?"
                 }
+            
+            # CRITICAL: Return immediately after delete command - don't continue to smart response
+            logger.info(f"🗑️ Returning delete command response immediately")
+            # Remove user from waiting list before returning
+            users_waiting_for_response.discard(user_id)
+            logger.info(f"✅ User {user_id} removed from waiting list after delete command")
+            return format_telegram_response(result["response"])
+            
         elif text.lower().strip() in ["refresh memory", "sync memory"]:
             # Force refresh session from database (for memory sync issues)
             if MEMORY_IMPORTS_AVAILABLE and get_session_memory():
@@ -203,9 +206,29 @@ async def telegram_webhook(request: Request):
                     "success": True,
                     "response": "Your session has been refreshed. How can I help you with student visa information?"
                 }
+            
+            # CRITICAL: Return immediately after refresh command - don't continue to smart response
+            logger.info(f"🔄 Returning refresh command response immediately")
+            # Remove user from waiting list before returning
+            users_waiting_for_response.discard(user_id)
+            logger.info(f"✅ User {user_id} removed from waiting list after refresh command")
+            return format_telegram_response(result["response"])
+            
         else:
+            # Only load conversation history for normal messages (not delete commands)
+            conversation_history = []
+            if MEMORY_IMPORTS_AVAILABLE and get_session_memory():
+                try:
+                    memory = get_session_memory()
+                    conversation_context = memory.get_conversation_context(session_id)
+                    conversation_history = conversation_context.get("conversation_history", [])
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to get conversation history: {e}")
+            
             # Process message through your existing smart response system
             logger.info(f"🔍 Processing message through smart response system...")
+            
+        # Now process the message through smart response system (only for normal messages)
         if MEMORY_IMPORTS_AVAILABLE and get_smart_response():
             try:
                 logger.info(f"🔍 Smart response system available, calling generate_smart_response...")
