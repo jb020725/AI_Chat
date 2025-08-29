@@ -277,7 +277,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Memory System: {'Available' if MEMORY_AVAILABLE else 'Not Available'}")
     logger.info(f"RAG System: Completely removed from project")
     logger.info(f"Gemini AI: {'Available' if GEMINI_AVAILABLE else 'Not Available'}")
-    logger.info(f"Simple Chatbot: Direct LLM responses with session memory")
+    logger.info(f"Simple Chatbot: Direct LLM responses with session memory + PARALLEL 2-LLM processing")
     logger.info(f"Rate Limiting: 60/minute, 1000/hour per IP")
     logger.info(f"Concurrency Control: Max 20 concurrent LLM calls")
     yield
@@ -329,7 +329,7 @@ async def health_check():
         "rate_limiting": "Active - 60/minute, 1000/hour per IP",
         "concurrency_control": "Active - Max 20 concurrent LLM calls",
         "simple_chatbot_enabled": True,
-        "chatbot_type": "Direct LLM responses with session memory"
+        "chatbot_type": "Direct LLM responses with session memory + PARALLEL 2-LLM processing"
     }
 
 @app.get("/healthz")

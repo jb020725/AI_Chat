@@ -8,6 +8,7 @@ Features:
 - Send email notifications
 - Use session memory for personalization
 - No RAG - just direct LLM responses
+- PARALLEL 2-LLM processing for faster responses (contact extraction + response generation run simultaneously)
 """
 
 import logging
@@ -53,7 +54,7 @@ class SmartResponse:
             self.llm_model = None
     
     def generate_smart_response(self, user_message: str, session_id: str, conversation_history: List[Dict]) -> Dict[str, Any]:
-        """Generate response and handle lead capture"""
+        """Generate response and handle lead capture using PARALLEL 2-LLM processing"""
         try:
             if not self.llm_model:
                 return {
@@ -62,8 +63,24 @@ class SmartResponse:
                     "function_calls": []
                 }
             
-            # ✅ FIXED ORDER: Extract contact info FIRST
-            contact_info = self._extract_contact_info(user_message)
+            # ✅ PARALLEL PROCESSING: Run both LLM calls simultaneously
+            import concurrent.futures
+            
+            # Create a thread pool for parallel LLM calls
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                # Submit both tasks simultaneously
+                contact_extraction_future = executor.submit(
+                    self._extract_contact_info_parallel, user_message
+                )
+                response_generation_future = executor.submit(
+                    self._generate_response_parallel, user_message, session_id, conversation_history
+                )
+                
+                # Wait for both to complete (they run in parallel)
+                contact_info = contact_extraction_future.result()
+                ai_response = response_generation_future.result()
+            
+            logger.info(f"🔍 PARALLEL PROCESSING COMPLETE: Contact info extracted, response generated")
             logger.info(f"🔍 Contact info extracted: {contact_info}")
             
             # ✅ FIXED ORDER: Update session memory with extracted info
@@ -73,34 +90,15 @@ class SmartResponse:
             # ✅ FIXED ORDER: Now detect and save/update lead with the extracted info
             lead_saved = self._detect_and_save_lead(user_message, session_id)
             
-            # Create response prompt with data from Supabase (not session memory)
-            prompt = self._create_response_prompt(user_message, session_id, conversation_history, lead_saved)
+            # Update session memory with this exchange
+            self._update_session_memory_with_exchange(session_id, user_message, ai_response)
             
-            # Get response from LLM
-            try:
-                response = self.llm_model.generate_content(prompt)
-                if response and hasattr(response, 'text'):
-                    ai_response = response.text
-                else:
-                    ai_response = "I understand your question. Let me help you with that."
-                
-                # Update session memory with this exchange
-                self._update_session_memory_with_exchange(session_id, user_message, ai_response)
-                
-                return {
-                    "response": ai_response,
-                    "success": True,
-                    "function_calls": [],
-                    "user_info_extracted": contact_info
-                }
-                
-            except Exception as e:
-                logger.error(f"Error calling LLM: {e}")
-                return {
-                    "response": "I'm experiencing technical difficulties. Please try again or ask a different question.",
-                    "success": False,
-                    "error": str(e)
-                }
+            return {
+                "response": ai_response,
+                "success": True,
+                "function_calls": [],
+                "user_info_extracted": contact_info
+            }
                 
         except Exception as e:
             logger.error(f"Error in generate_smart_response: {e}")
@@ -451,6 +449,123 @@ class SmartResponse:
             import traceback
             logger.error(f"❌ Traceback: {traceback.format_exc()}")
             return self._extract_contact_info_basic(message)
+
+    def _extract_contact_info_parallel(self, message: str) -> Dict[str, str]:
+        """Extract contact information using AI - PARALLEL VERSION"""
+        try:
+            if not self.llm_model:
+                logger.warning("❌ No LLM model available for AI extraction, falling back to basic extraction")
+                return self._extract_contact_info_basic(message)
+            
+            logger.info(f"🤖 PARALLEL AI EXTRACTION STARTED for message: '{message[:100]}...'")
+            
+            # Create AI extraction prompt
+            extraction_prompt = f"""
+            Extract information from this user message: "{message}"
+            
+            Return ONLY a valid JSON object with these exact fields:
+            {{
+                "name": "extracted name or null",
+                "phone": "extracted phone or null",
+                "email": "extracted email or null",
+                "country": "extracted country or null",
+                "study_level": "extracted study level or null",
+                "program": "extracted program or null",
+                "intake": "extracted intake or null"
+            }}
+            
+            Extraction Rules:
+            1. NAME: Look for "my name is", "i am", "i'm", "call me", "this is" patterns
+            2. EMAIL: Find any valid email address format
+            3. PHONE: Find phone numbers (digits, may include +, spaces, dashes, parentheses)
+            4. COUNTRY: Look for USA, UK, Australia, South Korea (or variations)
+            5. STUDY_LEVEL: Look for bachelor, master, masters, phd, diploma, etc.
+            6. PROGRAM: Look for field of study like IT, computer science, engineering, business, etc.
+            7. INTAKE: Look for fall, spring, summer, winter, or month names
+            
+            Examples:
+            - "i am cursor bot" → name: "cursor bot"
+            - "9999999999 is my contact" → phone: "9999999999"
+            - "cursorgdh@gmail.com" → email: "cursorgdh@gmail.com"
+            - "planning to apply for masters" → study_level: "master"
+            - "apply in it sector" → program: "it"
+            - "interested in usa" → country: "usa"
+            
+            Return ONLY the JSON, no other text.
+            """
+            
+            # Use AI to extract information
+            try:
+                response = self.llm_model.generate_content(extraction_prompt)
+                if response and hasattr(response, 'text'):
+                    import json
+                    # Clean the response to get just the JSON
+                    response_text = response.text.strip()
+                    # Remove any markdown formatting
+                    if response_text.startswith('```json'):
+                        response_text = response_text.replace('```json', '').replace('```', '').strip()
+                    elif response_text.startswith('```'):
+                        response_text = response_text.replace('```', '').strip()
+                    
+                    # Parse the JSON response
+                    contact_info = json.loads(response_text)
+                    
+                    # Clean up the extracted data
+                    cleaned_info = {}
+                    for key, value in contact_info.items():
+                        if value and value != "null" and value.lower() != "null":
+                            cleaned_info[key] = value.strip()
+                        else:
+                            cleaned_info[key] = None
+                    
+                    logger.info(f"🤖 PARALLEL AI EXTRACTION SUCCESS: {cleaned_info}")
+                    return cleaned_info
+                    
+                else:
+                    logger.error("❌ AI extraction failed - no response text")
+                    return self._extract_contact_info_basic(message)
+                    
+            except json.JSONDecodeError as e:
+                logger.error(f"❌ AI extraction failed - invalid JSON: {e}")
+                logger.error(f"❌ Raw AI response: {response.text if response else 'No response'}")
+                return self._extract_contact_info_basic(message)
+                
+            except Exception as e:
+                logger.error(f"❌ AI extraction failed: {e}")
+                return self._extract_contact_info_basic(message)
+                
+        except Exception as e:
+            logger.error(f"❌ Error in parallel AI extraction: {e}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            return self._extract_contact_info_basic(message)
+
+    def _generate_response_parallel(self, user_message: str, session_id: str, conversation_history: List[Dict]) -> str:
+        """Generate AI response - PARALLEL VERSION"""
+        try:
+            logger.info(f"🤖 PARALLEL RESPONSE GENERATION STARTED for message: '{user_message[:100]}...'")
+            
+            # Create response prompt with data from Supabase (not session memory)
+            prompt = self._create_response_prompt(user_message, session_id, conversation_history, False)  # lead_saved not known yet
+            
+            # Get response from LLM
+            try:
+                response = self.llm_model.generate_content(prompt)
+                if response and hasattr(response, 'text'):
+                    ai_response = response.text
+                    logger.info(f"🤖 PARALLEL RESPONSE GENERATION SUCCESS: {len(ai_response)} characters")
+                    return ai_response
+                else:
+                    logger.error("❌ AI response generation failed - no response text")
+                    return "I understand your question. Let me help you with that."
+                    
+            except Exception as e:
+                logger.error(f"Error calling LLM for response: {e}")
+                return "I'm experiencing technical difficulties. Please try again or ask a different question."
+                
+        except Exception as e:
+            logger.error(f"❌ Error in parallel response generation: {e}")
+            return "I encountered an error. Please try again."
     
     def _extract_contact_info_basic(self, message: str) -> Dict[str, str]:
         """Fallback basic extraction if AI fails"""
