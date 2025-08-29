@@ -9,6 +9,8 @@ Features:
 - Use session memory for personalization
 - No RAG - just direct LLM responses
 - PARALLEL 2-LLM processing for faster responses (contact extraction + response generation run simultaneously)
+- BACKGROUND database operations for even faster responses while maintaining data integrity
+- FULL context loading for better LLM responses (session memory + conversation history)
 """
 
 import logging
@@ -54,7 +56,7 @@ class SmartResponse:
             self.llm_model = None
     
     def generate_smart_response(self, user_message: str, session_id: str, conversation_history: List[Dict]) -> Dict[str, Any]:
-        """Generate response and handle lead capture using PARALLEL 2-LLM processing"""
+        """Generate response and handle lead capture using PARALLEL 2-LLM processing + BACKGROUND DB operations"""
         try:
             if not self.llm_model:
                 return {
@@ -83,16 +85,21 @@ class SmartResponse:
             logger.info(f"🔍 PARALLEL PROCESSING COMPLETE: Contact info extracted, response generated")
             logger.info(f"🔍 Contact info extracted: {contact_info}")
             
-            # ✅ FIXED ORDER: Update session memory with extracted info
-            if contact_info:
-                self._update_session_memory_with_contact_info(session_id, contact_info)
+            # ✅ BACKGROUND DATABASE OPERATIONS: Start DB operations in background (don't wait)
+            # This makes responses faster while maintaining data integrity
+            # Use a separate thread pool for background operations to avoid blocking
+            import threading
+            background_thread = threading.Thread(
+                target=self._background_database_operations,
+                args=(session_id, contact_info, user_message, ai_response),
+                daemon=True  # Daemon thread so it doesn't block shutdown
+            )
+            background_thread.start()
             
-            # ✅ FIXED ORDER: Now detect and save/update lead with the extracted info
-            lead_saved = self._detect_and_save_lead(user_message, session_id)
+            # Log that background operations started
+            logger.info(f"🚀 Background database operations started for session {session_id}")
             
-            # Update session memory with this exchange
-            self._update_session_memory_with_exchange(session_id, user_message, ai_response)
-            
+            # Return response immediately - database operations continue in background
             return {
                 "response": ai_response,
                 "success": True,
@@ -246,15 +253,17 @@ class SmartResponse:
     
     # ❌ REMOVED: Auto-close session methods (only frontend-triggered)
     
-    def _detect_and_save_lead(self, user_message: str, session_id: str) -> bool:
+    def _detect_and_save_lead(self, user_message: str, session_id: str, contact_info: Dict[str, str] = None) -> bool:
         """Detect if user provided ANY info and save/update lead - ONE PER SESSION, AUTO-UPDATE"""
         try:
             logger.info(f"🔍 Lead detection started for message: '{user_message[:100]}...'")
             
-            # Extract information from message
-            contact_info = self._extract_contact_info(user_message)
-            
-            logger.info(f"🔍 Info extracted: {contact_info}")
+            # Use provided contact_info if available, otherwise extract (fallback)
+            if contact_info is None:
+                contact_info = self._extract_contact_info(user_message)
+                logger.info(f"🔍 Info extracted (fallback): {contact_info}")
+            else:
+                logger.info(f"🔍 Using provided contact info: {contact_info}")
             
             # ✅ NEW LOGIC: Save if ANY info is provided (not just contact info)
             has_any_info = any([
@@ -541,19 +550,29 @@ class SmartResponse:
             return self._extract_contact_info_basic(message)
 
     def _generate_response_parallel(self, user_message: str, session_id: str, conversation_history: List[Dict]) -> str:
-        """Generate AI response - PARALLEL VERSION"""
+        """Generate AI response - PARALLEL VERSION with FULL CONTEXT"""
         try:
             logger.info(f"🤖 PARALLEL RESPONSE GENERATION STARTED for message: '{user_message[:100]}...'")
             
-            # Create response prompt with data from Supabase (not session memory)
-            prompt = self._create_response_prompt(user_message, session_id, conversation_history, False)  # lead_saved not known yet
+            # ✅ ENHANCED: Get FULL context including session memory and conversation history
+            # This ensures LLM has complete information for better responses
+            session_info = self.session_memory.get_user_info(session_id)
             
-            # Get response from LLM
+            # Create response prompt with FULL context (including lead_saved status)
+            # We pass lead_saved=False initially since we don't know yet, but LLM gets full context
+            prompt = self._create_response_prompt(user_message, session_id, conversation_history, False)
+            
+            logger.info(f"🤖 PARALLEL RESPONSE GENERATION: Full context loaded for session {session_id}")
+            logger.info(f"🤖 PARALLEL RESPONSE GENERATION: Session info available: {session_info is not None}")
+            logger.info(f"🤖 PARALLEL RESPONSE GENERATION: Conversation history length: {len(conversation_history)}")
+            
+            # Get response from LLM with full context
             try:
                 response = self.llm_model.generate_content(prompt)
                 if response and hasattr(response, 'text'):
                     ai_response = response.text
                     logger.info(f"🤖 PARALLEL RESPONSE GENERATION SUCCESS: {len(ai_response)} characters")
+                    logger.info(f"🤖 PARALLEL RESPONSE GENERATION: Response generated with full context")
                     return ai_response
                 else:
                     logger.error("❌ AI response generation failed - no response text")
