@@ -61,6 +61,11 @@ export const ChatBox = () => {
     setInputMessage("");
     setIsProcessing(true);
 
+    // Hide mobile keyboard by blurring textarea
+    if (textareaRef.current) {
+      textareaRef.current.blur();
+    }
+
     try {
       const data = await sendMessage(userMessage.text);
 
@@ -82,12 +87,12 @@ export const ChatBox = () => {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsProcessing(false);
-      // Keep focus on textarea for smooth UX
+      // Restore focus after a delay for smooth UX
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.focus();
         }
-      }, 100);
+      }, 500);
     }
   };
 
@@ -118,7 +123,7 @@ export const ChatBox = () => {
               <div
                 key={message.id}
                 className={cn(
-                  "flex w-full animate-in fade-in-0 slide-in-from-bottom-2 duration-300",
+                  "flex w-full animate-in fade-in-0 slide-in-from-bottom-2 duration-500",
                   message.isUser ? "justify-end" : "justify-start"
                 )}
               >
@@ -128,10 +133,10 @@ export const ChatBox = () => {
                 )}>
                   <div
                     className={cn(
-                      "rounded-2xl px-4 py-3 shadow-sm transition-all duration-200",
+                      "rounded-2xl px-4 py-3 shadow-sm transition-all duration-300 transform",
                       message.isUser
-                        ? "bg-blue-600 text-white ml-auto rounded-br-md"
-                        : "bg-gray-50 text-gray-900 rounded-bl-md border border-gray-100"
+                        ? "bg-blue-600 text-white ml-auto rounded-br-md animate-in slide-in-from-right-2"
+                        : "bg-gray-50 text-gray-900 rounded-bl-md border border-gray-100 animate-in slide-in-from-left-2"
                     )}
                   >
                     <p className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap break-words">
@@ -142,14 +147,22 @@ export const ChatBox = () => {
               </div>
             ))}
 
-            {/* Processing indicator - ChatGPT-like */}
+            {/* Processing indicator - Animated search with movement */}
             {isProcessing && (
               <div className="flex justify-start">
                 <div className="max-w-[90%] sm:max-w-[80%] lg:max-w-[70%]">
-                  <div className="bg-gray-50 rounded-2xl rounded-bl-md px-4 py-3 border border-gray-100">
-                    <div className="flex items-center space-x-2 text-gray-600">
-                      <Search className="w-4 h-4 animate-pulse" />
-                      <span className="text-sm">Gathering information...</span>
+                  <div className="bg-gray-50 rounded-2xl rounded-bl-md px-4 py-3 border border-gray-100 animate-in slide-in-from-left-2 duration-300">
+                    <div className="flex items-center space-x-3 text-gray-600">
+                      <div className="relative">
+                        <Search className="w-4 h-4 animate-pulse text-blue-500" />
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-ping"></div>
+                      </div>
+                      <span className="text-sm font-medium">Searching for information...</span>
+                      <div className="flex space-x-1">
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce delay-100"></div>
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce delay-200"></div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -169,14 +182,14 @@ export const ChatBox = () => {
             onKeyDown={handleKeyDown}
             placeholder="Ask about student visas, requirements, or application processes..."
             disabled={false} // Always enabled for smooth UX
-            className="min-h-[44px] max-h-32 resize-none border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm rounded-xl transition-all duration-200"
+            className="min-h-[44px] max-h-32 resize-none border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm rounded-xl transition-all duration-200 mobile-input"
           />
           <Button
             onClick={handleSendMessage}
             disabled={isProcessing || !inputMessage.trim()}
             size="icon"
             className={cn(
-              "h-11 w-11 shrink-0 rounded-xl transition-all duration-200",
+              "h-11 w-11 shrink-0 rounded-xl transition-all duration-200 touch-target",
               isProcessing || !inputMessage.trim()
                 ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                 : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md"
