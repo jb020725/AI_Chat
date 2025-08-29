@@ -1,44 +1,20 @@
 #!/usr/bin/env python3
 """
-Telegram Bot Integration for AI Chatbot
-This shows how easy it is to integrate Telegram with your existing system.
+Telegram Bot Integration - FOCUSED VERSION
+Fixes: Double greeting + Delete system
 """
 
 from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 import logging
-import json
-from datetime import datetime
-import time
-from collections import defaultdict
-
-# Import your existing systems (SAME AS WEB) - with safe fallback
-try:
-    from app.memory.smart_response import get_smart_response
-    from app.memory import get_session_memory
-    MEMORY_IMPORTS_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️ Warning: Memory imports not available: {e}")
-    MEMORY_IMPORTS_AVAILABLE = False
-    # Create fallback functions
-    def get_smart_response():
-        return None
-    def get_session_memory():
-        return None
 
 logger = logging.getLogger(__name__)
 
-# Track users waiting for responses (prevent double question sending)
-users_waiting_for_response = set()
-
-# Track recent messages to prevent duplicates (module-level variable)
-recent_messages = {}
-
-# Telegram message models
+# Simple message models
 class TelegramMessage(BaseModel):
     message_id: int
-    from_: Dict[str, Any] = Field(alias="from")  # Telegram sends "from", not "from_user"
+    from_: Dict[str, Any] = Field(alias="from")
     chat: Dict[str, Any]
     text: Optional[str] = None
     date: int
@@ -54,54 +30,18 @@ def create_telegram_session_id(user_id: int) -> str:
     """Create a session ID for Telegram users"""
     return f"telegram_{user_id}"
 
-async def send_typing_action(chat_id: int) -> None:
-    """Send typing indicator to show bot is working"""
-    try:
-        import requests
-        
-        # Get bot token from environment
-        try:
-            from app.config import settings
-            bot_token = settings.TELEGRAM_BOT_TOKEN
-        except ImportError:
-            import os
-            bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-        
-        if not bot_token:
-            logger.warning("No bot token available for typing indicator")
-            return
-        
-        # Send typing action
-        typing_url = f"https://api.telegram.org/bot{bot_token}/sendChatAction"
-        typing_data = {
-            "chat_id": chat_id,
-            "action": "typing"
-        }
-        
-        response = requests.post(typing_url, json=typing_data, timeout=5)
-        
-        if response.status_code == 200:
-            logger.debug(f"✅ Typing indicator sent to chat {chat_id}")
-        else:
-            logger.warning(f"⚠️ Failed to send typing indicator: {response.status_code}")
-            
-    except Exception as e:
-        logger.warning(f"⚠️ Error sending typing indicator: {e}")
-
-def format_telegram_response(text: str) -> Dict[str, Any]:
+def format_telegram_response(text: str, chat_id: int) -> Dict[str, Any]:
     """Format response for Telegram"""
     return {
         "method": "sendMessage",
-        "chat_id": None,  # Will be set by the calling function
+        "chat_id": chat_id,
         "text": text,
-        "parse_mode": "HTML",  # Support basic HTML formatting
-
+        "parse_mode": "HTML"
     }
-    
 
 @telegram_router.post("/webhook")
 async def telegram_webhook(request: Request):
-    """Handle incoming Telegram webhooks"""
+    """Handle incoming Telegram webhooks - FOCUSED VERSION"""
     try:
         # Get the update from Telegram
         update_data = await request.json()
@@ -111,231 +51,87 @@ async def telegram_webhook(request: Request):
             return {"ok": True}
         
         message = update.message
-        user_id = message.from_["id"]  # Use from_ instead of from_user
+        user_id = message.from_["id"]
         chat_id = message.chat["id"]
         text = message.text
         session_id = create_telegram_session_id(user_id)
         
-        # Check if user is already waiting for a response
-        if user_id in users_waiting_for_response:
-            logger.info(f"⏳ User {user_id} already waiting for response - ignoring message")
-            return {"ok": True}  # Ignore message, don't respond
-        
-        # Check if this is a duplicate message (same text, same user, within 5 seconds)
-        current_time = time.time()
-        message_key = f"{user_id}_{text}"
-        if message_key in recent_messages:
-            last_time = recent_messages[message_key]
-            if current_time - last_time < 5:  # Within 5 seconds
-                logger.info(f"⏳ Duplicate message detected for user {user_id} within 5 seconds - ignoring")
-                return {"ok": True}
-        
-        # Store this message to prevent duplicates
-        recent_messages[message_key] = current_time
-        
-        # Clean up old messages (older than 1 minute) to prevent memory bloat
-        cleanup_time = current_time - 60
-        recent_messages = {k: v for k, v in recent_messages.items() if v > cleanup_time}
-        
-        # Mark user as waiting for response
-        users_waiting_for_response.add(user_id)
-        
         logger.info(f"📱 Telegram message from user {user_id}: {text}")
         
-        # Send typing indicator to show bot is working
-        try:
-            await send_typing_action(chat_id)
-            logger.info(f"⌨️ Sent typing indicator to user {user_id}")
-        except Exception as typing_error:
-            logger.warning(f"⚠️ Failed to send typing indicator: {typing_error}")
-        
-        # Check for special commands first (BEFORE loading conversation history)
-        if text.lower().strip() in ["/start"]:
-            # Handle /start command with welcome message
+        # Handle /start command
+        if text.lower().strip() == "/start":
             response_text = "Hello! Welcome to our student visa consultancy. I'm here to help you with information about student visas for USA, UK, Australia, and South Korea. How can I assist you today?"
-            
-            result = {
-                "success": True,
-                "response": response_text
-            }
-            
-            # Return immediately after start command
-            logger.info(f"🚀 User {user_id} started the bot")
-            users_waiting_for_response.discard(user_id)
-            logger.info(f"✅ User {user_id} removed from waiting list after start command")
-            telegram_response = format_telegram_response(result["response"])
-            telegram_response["chat_id"] = chat_id
-            return telegram_response
-            
-        elif text.lower().strip() in ["delete history", "clear history", "reset", "start over", "delete my data", "delete data", "clear data", "remove data", "delete my info", "delete info", "nuclear reset", "start fresh", "new conversation"]:
-            # NUCLEAR RESET - clear EVERYTHING for this user
-            if MEMORY_IMPORTS_AVAILABLE and get_session_memory():
-                try:
-                    memory = get_session_memory()
-                    
-                    # Use nuclear reset for complete fresh start
-                    if text.lower().strip() in ["nuclear reset", "start fresh", "new conversation"]:
-                        memory.nuclear_reset_session(session_id)
-                        logger.info(f"☢️ User {user_id} requested NUCLEAR RESET - complete fresh start")
-                        response_text = "☢️ NUCLEAR RESET COMPLETE! All data has been completely wiped. This is a completely fresh start - I have no memory of any previous conversations. How can I help you with student visa information?"
-                    else:
-                        # Regular clear for other commands
-                        memory.clear_session_data(session_id)
-                        logger.info(f"🗑️ User {user_id} requested history deletion - session cleared")
-                        response_text = "Your conversation history has been cleared. How can I help you with student visa information?"
-                    
-                    # CRITICAL: Force empty conversation history
-                    conversation_history = []
-                    logger.info(f"🗑️ Conversation history forced empty for session {session_id}")
-                    
-                    result = {
-                        "success": True,
-                        "response": response_text
-                    }
-                except Exception as e:
-                    logger.error(f"❌ Failed to clear session data: {e}")
-                    result = {
-                        "success": False,
-                        "error": str(e),
-                        "response": "I'm experiencing technical difficulties. Please try again."
-                    }
-            else:
-                result = {
-                    "success": True,
-                    "response": "Your conversation history has been cleared. How can I help you with student visa information?"
-                }
-            
-            # CRITICAL: Return immediately after delete command - don't continue to smart response
-            logger.info(f"🗑️ Returning delete command response immediately")
-            # Remove user from waiting list before returning
-            users_waiting_for_response.discard(user_id)
-            logger.info(f"✅ User {user_id} removed from waiting list after delete command")
-            telegram_response = format_telegram_response(result["response"])
-            telegram_response["chat_id"] = chat_id
-            return telegram_response
-            
-        elif text.lower().strip() in ["refresh memory", "sync memory"]:
-            # Force refresh session from database (for memory sync issues)
-            if MEMORY_IMPORTS_AVAILABLE and get_session_memory():
-                try:
-                    memory = get_session_memory()
-                    # Force refresh from database
-                    memory.force_refresh_telegram_session(session_id)
-                    logger.info(f"🔄 User {user_id} requested memory refresh - session synced with database")
-                    result = {
-                        "success": True,
-                        "response": "Your session has been refreshed and synced with the database. How can I help you with student visa information?"
-                    }
-                except Exception as e:
-                    logger.error(f"❌ Failed to refresh session: {e}")
-                    result = {
-                        "success": False,
-                        "error": str(e),
-                        "response": "I'm experiencing technical difficulties. Please try again."
-                    }
-            else:
-                result = {
-                    "success": True,
-                    "response": "Your session has been refreshed. How can I help you with student visa information?"
-                }
-            
-            # CRITICAL: Return immediately after refresh command - don't continue to smart response
-            logger.info(f"🔄 Returning refresh command response immediately")
-            # Remove user from waiting list before returning
-            users_waiting_for_response.discard(user_id)
-            logger.info(f"✅ User {user_id} removed from waiting list after refresh command")
-            telegram_response = format_telegram_response(result["response"])
-            telegram_response["chat_id"] = chat_id
-            return telegram_response
-            
-        else:
-            # Only load conversation history for normal messages (not delete commands)
-            conversation_history = []
-            if MEMORY_IMPORTS_AVAILABLE and get_session_memory():
-                try:
-                    memory = get_session_memory()
-                    conversation_context = memory.get_conversation_context(session_id)
-                    conversation_history = conversation_context.get("conversation_history", [])
-                except Exception as e:
-                    logger.warning(f"⚠️ Failed to get conversation history: {e}")
-            
-            # Process message through your existing smart response system
-            logger.info(f"🔍 Processing message through smart response system...")
-            
-        # Now process the message through smart response system (only for normal messages)
-        if MEMORY_IMPORTS_AVAILABLE and get_smart_response():
-            try:
-                logger.info(f"🔍 Smart response system available, calling generate_smart_response...")
-                result = get_smart_response().generate_smart_response(
-                    user_message=text,
-                    session_id=session_id,
-                    conversation_history=conversation_history
-                )
-                logger.info(f"🔍 Smart response result: {result}")
-            except Exception as e:
-                logger.error(f"❌ Smart response failed: {e}")
-                result = {
-                    "success": False,
-                    "error": str(e),
-                    "response": "I'm experiencing technical difficulties. Please try again."
-                }
-        else:
-            # Fallback response if smart response system is not available
-            logger.warning(f"⚠️ Smart response system not available, using fallback")
-            result = {
-                "success": True,
-                "response": "I'm experiencing technical difficulties. Please try again."
-            }
+            return format_telegram_response(response_text, chat_id)
         
-        if result.get('success'):
-            ai_response = result.get('response', '')
-            logger.info(f"🤖 AI Response: {ai_response[:100]}...")
+        # Handle delete commands - ACTUALLY DELETE DATA
+        elif text.lower().strip() in ["delete my data", "delete data", "clear data", "delete my chat", "delete chat", "clear chat", "delete history", "clear history"]:
+            try:
+                from app.memory import get_session_memory
+                memory = get_session_memory()
+                
+                # ACTUALLY DELETE the session data
+                memory.clear_session_data(session_id)
+                logger.info(f"🗑️ User {user_id} requested data deletion - session data CLEARED from database")
+                
+                response_text = "✅ Your data has been completely deleted from our system. This is a fresh start - I have no memory of our previous conversation. How can I help you with student visa information?"
+                
+            except Exception as e:
+                logger.error(f"❌ Failed to delete session data: {e}")
+                response_text = "I'm experiencing technical difficulties with data deletion. Please try again."
             
-            # IMPORTANT: Save conversation exchange to memory for persistence
-            if MEMORY_IMPORTS_AVAILABLE and get_session_memory():
-                try:
-                    memory = get_session_memory()
-                    memory.add_conversation_exchange(session_id, text, ai_response)
-                    logger.info(f"💾 Conversation saved to memory for session {session_id}")
-                except Exception as mem_error:
-                    logger.warning(f"⚠️ Failed to save conversation to memory: {mem_error}")
+            return format_telegram_response(response_text, chat_id)
+        
+        # For normal messages, use smart response system
+        try:
+            from app.memory.smart_response import get_smart_response
+            from app.memory import get_session_memory
+            
+            # Get conversation history
+            memory = get_session_memory()
+            conversation_context = memory.get_conversation_context(session_id)
+            conversation_history = conversation_context.get("conversation_history", [])
+            
+            # CRITICAL FIX: If this is a fresh conversation (no history), force empty context
+            if not conversation_history:
+                logger.info(f"🆕 Fresh conversation detected for user {user_id} - forcing empty context")
+                conversation_history = []
+            
+            # Generate response
+            smart_response = get_smart_response()
+            result = smart_response.generate_smart_response(
+                user_message=text,
+                session_id=session_id,
+                conversation_history=conversation_history
+            )
+            
+            if result.get('success'):
+                ai_response = result.get('response', '')
+                
+                # Save conversation to memory
+                memory.add_conversation_exchange(session_id, text, ai_response)
+                logger.info(f"💾 Conversation saved to memory for session {session_id}")
+                
+                return format_telegram_response(ai_response, chat_id)
             else:
-                logger.info(f"💾 Memory system not available - skipping conversation save")
-            
-            # Remove user from waiting list - they can now send another message
-            users_waiting_for_response.discard(user_id)
-            logger.info(f"✅ User {user_id} can now send another message")
-            
-            # Format response for Telegram
-            telegram_response = format_telegram_response(ai_response)
-            telegram_response["chat_id"] = chat_id
-            
-            # Return the response (Telegram will send it)
-            return telegram_response
-        else:
-            logger.error(f"❌ Smart response failed: {result.get('error')}")
-            # Remove user from waiting list even on error
-            users_waiting_for_response.discard(user_id)
-            logger.info(f"✅ User {user_id} removed from waiting list due to error")
-            telegram_response = format_telegram_response("I'm experiencing technical difficulties. Please try again.")
-            telegram_response["chat_id"] = chat_id
-            return telegram_response
+                logger.error(f"❌ Smart response failed: {result.get('error')}")
+                return format_telegram_response("I'm experiencing technical difficulties. Please try again.", chat_id)
+                
+        except Exception as e:
+            logger.error(f"❌ Smart response failed: {e}")
+            # Fallback response
+            fallback_text = "Hello! I'm here to help with student visa information. How can I assist you today?"
+            return format_telegram_response(fallback_text, chat_id)
             
     except Exception as e:
         logger.error(f"❌ Telegram webhook error: {e}")
-        # Remove user from waiting list on any exception
-        if 'user_id' in locals():
-            users_waiting_for_response.discard(user_id)
-            logger.info(f"✅ User {user_id} removed from waiting list due to exception")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @telegram_router.get("/set-webhook")
 async def set_webhook(bot_token: str, webhook_url: str):
-    """Set Telegram webhook URL (for initial setup)"""
+    """Set Telegram webhook URL"""
     try:
         import requests
         
-        # Set webhook with Telegram
         webhook_data = {
             "url": webhook_url,
             "allowed_updates": ["message"],
@@ -350,43 +146,8 @@ async def set_webhook(bot_token: str, webhook_url: str):
         if response.status_code == 200:
             result = response.json()
             if result.get("ok"):
-                logger.info(f"✅ Telegram webhook set successfully: {webhook_url}")
                 return {"success": True, "message": "Webhook set successfully"}
             else:
-                logger.error(f"❌ Failed to set webhook: {result}")
-                return {"success": False, "error": result.get("description")}
-        else:
-            logger.error(f"❌ HTTP error setting webhook: {response.status_code}")
-            return {"success": False, "error": f"HTTP {response.status_code}"}
-            
-    except Exception as e:
-        logger.error(f"❌ Error setting webhook: {e}")
-        return {"success": False, "error": str(e)}
-
-@telegram_router.get("/bot-info")
-async def get_bot_info(bot_token: str):
-    """Get bot information from Telegram"""
-    try:
-        import requests
-        
-        response = requests.get(f"https://api.telegram.org/bot{bot_token}/getMe")
-        
-        if response.status_code == 200:
-            result = response.json()
-            if result.get("ok"):
-                bot_info = result.get("result", {})
-                return {
-                    "success": True,
-                    "bot_info": {
-                        "id": bot_info.get("id"),
-                        "name": bot_info.get("first_name"),
-                        "username": bot_info.get("username"),
-                        "can_join_groups": bot_info.get("can_join_groups"),
-                        "can_read_all_group_messages": bot_info.get("can_read_all_group_messages"),
-                        "supports_inline_queries": bot_info.get("supports_inline_queries")
-                    }
-                }
-            else:
                 return {"success": False, "error": result.get("description")}
         else:
             return {"success": False, "error": f"HTTP {response.status_code}"}
@@ -394,14 +155,3 @@ async def get_bot_info(bot_token: str):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-# Example usage in your main.py:
-"""
-# Add this to your main.py imports:
-from telegram_integration import telegram_router
-
-# Add this to your FastAPI app:
-app.include_router(telegram_router)
-
-# Your Telegram webhook will be available at:
-# https://your-backend-url.com/telegram/webhook
-"""
