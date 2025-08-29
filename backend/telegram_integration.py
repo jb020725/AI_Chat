@@ -204,8 +204,8 @@ async def telegram_webhook(request: Request):
                     "response": "Your session has been refreshed. How can I help you with student visa information?"
                 }
         else:
-                    # Process message through your existing smart response system
-        logger.info(f"🔍 Processing message through smart response system...")
+            # Process message through your existing smart response system
+            logger.info(f"🔍 Processing message through smart response system...")
         if MEMORY_IMPORTS_AVAILABLE and get_smart_response():
             try:
                 logger.info(f"🔍 Smart response system available, calling generate_smart_response...")
