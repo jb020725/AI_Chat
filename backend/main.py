@@ -617,7 +617,7 @@ def initialize_memory_system():
     """Initialize memory system safely"""
     global MEMORY_AVAILABLE, GEMINI_AVAILABLE
     
-    if MEMORY_AVAILABLE and GEMINI_AVAILABLE and get_smart_response:
+    if MEMORY_AVAILABLE and GEMINI_AVAILABLE and callable(get_smart_response):
         try:
             # Initialize the smart response system for simple chatbot
             logger.info("🔄 About to set LLM model in smart response system...")
