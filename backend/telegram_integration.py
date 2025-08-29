@@ -163,7 +163,9 @@ async def telegram_webhook(request: Request):
             logger.info(f"🚀 User {user_id} started the bot")
             users_waiting_for_response.discard(user_id)
             logger.info(f"✅ User {user_id} removed from waiting list after start command")
-            return format_telegram_response(result["response"])
+            telegram_response = format_telegram_response(result["response"])
+            telegram_response["chat_id"] = chat_id
+            return telegram_response
             
         elif text.lower().strip() in ["delete history", "clear history", "reset", "start over", "delete my data", "delete data", "clear data", "remove data", "delete my info", "delete info", "nuclear reset", "start fresh", "new conversation"]:
             # NUCLEAR RESET - clear EVERYTHING for this user
@@ -208,7 +210,9 @@ async def telegram_webhook(request: Request):
             # Remove user from waiting list before returning
             users_waiting_for_response.discard(user_id)
             logger.info(f"✅ User {user_id} removed from waiting list after delete command")
-            return format_telegram_response(result["response"])
+            telegram_response = format_telegram_response(result["response"])
+            telegram_response["chat_id"] = chat_id
+            return telegram_response
             
         elif text.lower().strip() in ["refresh memory", "sync memory"]:
             # Force refresh session from database (for memory sync issues)
@@ -240,7 +244,9 @@ async def telegram_webhook(request: Request):
             # Remove user from waiting list before returning
             users_waiting_for_response.discard(user_id)
             logger.info(f"✅ User {user_id} removed from waiting list after refresh command")
-            return format_telegram_response(result["response"])
+            telegram_response = format_telegram_response(result["response"])
+            telegram_response["chat_id"] = chat_id
+            return telegram_response
             
         else:
             # Only load conversation history for normal messages (not delete commands)
@@ -311,7 +317,9 @@ async def telegram_webhook(request: Request):
             # Remove user from waiting list even on error
             users_waiting_for_response.discard(user_id)
             logger.info(f"✅ User {user_id} removed from waiting list due to error")
-            return format_telegram_response("I'm experiencing technical difficulties. Please try again.")
+            telegram_response = format_telegram_response("I'm experiencing technical difficulties. Please try again.")
+            telegram_response["chat_id"] = chat_id
+            return telegram_response
             
     except Exception as e:
         logger.error(f"❌ Telegram webhook error: {e}")
