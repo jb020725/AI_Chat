@@ -391,6 +391,87 @@ class SessionMemory:
         
         logger.info(f"Cleared session: {session_id}")
     
+    def clear_session_data(self, session_id: str) -> None:
+        """Force clear session data and refresh from database (for Telegram memory sync)"""
+        # Remove from memory
+        if session_id in self.sessions:
+            del self.sessions[session_id]
+            logger.info(f"🗑️ Session {session_id} removed from memory")
+        
+        # Force delete from Supabase database
+        if self.supabase and self._is_telegram_session(session_id):
+            try:
+                # Delete from sessions table
+                result = self.supabase.table("sessions").delete().eq("session_id", session_id).execute()
+                logger.info(f"🗑️ Session {session_id} deleted from Supabase database")
+                
+                # Also delete from leads table if exists
+                try:
+                    lead_result = self.supabase.table("leads").delete().eq("session_id", session_id).execute()
+                    logger.info(f"🗑️ Lead data for session {session_id} deleted from Supabase")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not delete lead data: {e}")
+                    
+            except Exception as e:
+                logger.error(f"❌ Failed to delete session {session_id} from Supabase: {e}")
+        else:
+            logger.info(f"ℹ️ Session {session_id} is not a Telegram session or Supabase not available")
+        
+        logger.info(f"✅ Session {session_id} completely cleared and synced with database")
+    
+    def force_refresh_telegram_session(self, session_id: str) -> None:
+        """Force refresh Telegram session from database (for memory sync issues)"""
+        if not self._is_telegram_session(session_id):
+            logger.info(f"Session {session_id} is not a Telegram session - no refresh needed")
+            return
+            
+        if not self.supabase:
+            logger.warning(f"Cannot refresh session {session_id} - Supabase not available")
+            return
+            
+        try:
+            # Remove from memory to force fresh load
+            if session_id in self.sessions:
+                del self.sessions[session_id]
+                logger.info(f"🔄 Session {session_id} removed from memory for refresh")
+            
+            # Force load from database
+            result = self.supabase.table("sessions").select("*").eq("session_id", session_id).execute()
+            
+            if result.data and len(result.data) > 0:
+                session_data = result.data[0]
+                # Create new UserInfo from database
+                user_info = UserInfo(
+                    email=session_data.get('email'),
+                    phone=session_data.get('phone'),
+                    name=session_data.get('name'),
+                    country=session_data.get('country'),
+                    intake=session_data.get('intake'),
+                    program_level=session_data.get('program_level'),
+                    field_of_study=session_data.get('field_of_study'),
+                    conversation_summary=session_data.get('conversation_summary', ''),
+                    progress_state=session_data.get('progress_state', 'conversation_active'),
+                    exchange_count=session_data.get('exchange_count', 0)
+                )
+                
+                # Set timestamps
+                if session_data.get('created_at'):
+                    user_info.created_at = datetime.fromisoformat(session_data['created_at'])
+                if session_data.get('last_updated'):
+                    user_info.last_updated = datetime.fromisoformat(session_data['last_updated'])
+                
+                # Store in memory
+                self.sessions[session_id] = user_info
+                logger.info(f"✅ Session {session_id} refreshed from database successfully")
+            else:
+                logger.info(f"ℹ️ Session {session_id} not found in database - will be created fresh")
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to refresh session {session_id} from database: {e}")
+            # Create fresh session on error
+            self.sessions[session_id] = UserInfo()
+            logger.info(f"🆕 Created fresh session {session_id} due to refresh error")
+    
     def get_all_sessions(self) -> Dict[str, Dict[str, Any]]:
         """Get summary of all active sessions"""
         return {

@@ -60,9 +60,9 @@ class SmartResponse:
         try:
             if not self.llm_model:
                 return {
-                    "response": "Hello! I'm your professional student visa consultant. I can help you with visa applications for USA, UK, Australia, and South Korea. What country are you interested in studying in?",
-                    "success": True,
-                    "function_calls": []
+                    "response": "I'm experiencing technical difficulties. Please try again.",
+                    "success": False,
+                    "error": "LLM model not available"
                 }
             
             # ✅ PARALLEL PROCESSING: Run both LLM calls simultaneously

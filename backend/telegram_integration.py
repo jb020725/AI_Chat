@@ -140,27 +140,77 @@ async def telegram_webhook(request: Request):
             except Exception as e:
                 logger.warning(f"⚠️ Failed to get conversation history: {e}")
         
-        # Process message through your existing smart response system
-        if MEMORY_IMPORTS_AVAILABLE and get_smart_response():
-            try:
-                result = get_smart_response().generate_smart_response(
-                    user_message=text,
-                    session_id=session_id,
-                    conversation_history=conversation_history
-                )
-            except Exception as e:
-                logger.error(f"❌ Smart response failed: {e}")
+        # Check for special commands first
+        if text.lower().strip() in ["delete history", "clear history", "reset", "start over"]:
+            # Force delete all session data for this user
+            if MEMORY_IMPORTS_AVAILABLE and get_session_memory():
+                try:
+                    memory = get_session_memory()
+                    # Force refresh from database and clear
+                    memory.clear_session_data(session_id)
+                    logger.info(f"🗑️ User {user_id} requested history deletion - session cleared")
+                    result = {
+                        "success": True,
+                        "response": "Your conversation history has been cleared. How can I help you with student visa information?"
+                    }
+                except Exception as e:
+                    logger.error(f"❌ Failed to clear session data: {e}")
+                    result = {
+                        "success": False,
+                        "error": str(e),
+                        "response": "I'm experiencing technical difficulties. Please try again."
+                    }
+            else:
                 result = {
-                    "success": False,
-                    "error": str(e),
-                    "response": "I'm experiencing technical difficulties. Please try again."
+                    "success": True,
+                    "response": "Your conversation history has been cleared. How can I help you with student visa information?"
+                }
+        elif text.lower().strip() in ["refresh memory", "sync memory"]:
+            # Force refresh session from database (for memory sync issues)
+            if MEMORY_IMPORTS_AVAILABLE and get_session_memory():
+                try:
+                    memory = get_session_memory()
+                    # Force refresh from database
+                    memory.force_refresh_telegram_session(session_id)
+                    logger.info(f"🔄 User {user_id} requested memory refresh - session synced with database")
+                    result = {
+                        "success": True,
+                        "response": "Your session has been refreshed and synced with the database. How can I help you with student visa information?"
+                    }
+                except Exception as e:
+                    logger.error(f"❌ Failed to refresh session: {e}")
+                    result = {
+                        "success": False,
+                        "error": str(e),
+                        "response": "I'm experiencing technical difficulties. Please try again."
+                    }
+            else:
+                result = {
+                    "success": True,
+                    "response": "Your session has been refreshed. How can I help you with student visa information?"
                 }
         else:
-            # Fallback response if smart response system is not available
-            result = {
-                "success": True,
-                "response": "Hello! I'm your AI visa consultant. How can I help you with student visa information for USA, UK, Australia, or South Korea?"
-            }
+            # Process message through your existing smart response system
+            if MEMORY_IMPORTS_AVAILABLE and get_smart_response():
+                try:
+                    result = get_smart_response().generate_smart_response(
+                        user_message=text,
+                        session_id=session_id,
+                        conversation_history=conversation_history
+                    )
+                except Exception as e:
+                    logger.error(f"❌ Smart response failed: {e}")
+                    result = {
+                        "success": False,
+                        "error": str(e),
+                        "response": "I'm experiencing technical difficulties. Please try again."
+                    }
+            else:
+                # Fallback response if smart response system is not available
+                result = {
+                    "success": True,
+                    "response": "I'm experiencing technical difficulties. Please try again."
+                }
         
         if result.get('success'):
             ai_response = result.get('response', '')
