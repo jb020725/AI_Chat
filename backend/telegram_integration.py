@@ -60,7 +60,7 @@ async def send_typing_action(chat_id: int) -> None:
             logger.warning("No bot token available for typing indicator")
             return
         
-        # Send typing action - shows "typing..." in chat
+        # Send typing action - shows "typing..." in chat area (not at top)
         typing_url = f"https://api.telegram.org/bot{bot_token}/sendChatAction"
         typing_data = {
             "chat_id": chat_id,
@@ -123,14 +123,14 @@ async def telegram_webhook(request: Request):
         
         logger.info(f"📱 Telegram message from user {user_id}: {text}")
         
-        # MESSAGE QUEUE SYSTEM: Check if user is already being processed
+        # IMPROVED MESSAGE QUEUE SYSTEM: Check if user is already being processed
         if user_id in users_being_processed:
-            logger.info(f"⏳ User {user_id} already being processed - ignoring message")
+            logger.info(f"⏳ User {user_id} already being processed - ignoring message: '{text}'")
             return {"ok": True}  # Ignore message, don't respond
         
-        # Mark user as being processed
+        # Mark user as being processed IMMEDIATELY
         users_being_processed.add(user_id)
-        logger.info(f"🔄 User {user_id} marked as being processed")
+        logger.info(f"🔄 User {user_id} marked as being processed for message: '{text}'")
         
         try:
             # Handle /start command
@@ -167,7 +167,7 @@ async def telegram_webhook(request: Request):
             
             # For normal messages, use smart response system
             try:
-                # SHOW TYPING INDICATOR - appears where message will come
+                # SHOW TYPING INDICATOR - appears where message will come (in chat area)
                 await send_typing_action(chat_id)
                 logger.info(f"⌨️ Typing indicator shown for user {user_id}")
                 
