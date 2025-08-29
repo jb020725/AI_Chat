@@ -419,6 +419,50 @@ class SessionMemory:
         
         logger.info(f"✅ Session {session_id} completely cleared and synced with database")
     
+    def nuclear_reset_session(self, session_id: str) -> None:
+        """Nuclear reset - clear EVERYTHING for a session (for complete fresh start)"""
+        logger.info(f"☢️ NUCLEAR RESET initiated for session {session_id}")
+        
+        # 1. Remove from memory completely
+        if session_id in self.sessions:
+            del self.sessions[session_id]
+            logger.info(f"☢️ Session {session_id} removed from memory")
+        
+        # 2. Force delete from ALL database tables
+        if self.supabase and self._is_telegram_session(session_id):
+            try:
+                # Delete from sessions table
+                result = self.supabase.table("sessions").delete().eq("session_id", session_id).execute()
+                logger.info(f"☢️ Session {session_id} deleted from sessions table")
+                
+                # Delete from leads table
+                try:
+                    lead_result = self.supabase.table("leads").delete().eq("session_id", session_id).execute()
+                    logger.info(f"☢️ Lead data for session {session_id} deleted from leads table")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not delete lead data: {e}")
+                
+                # Delete from any other tables that might exist
+                try:
+                    # Try to delete from any other potential tables
+                    for table_name in ["user_data", "conversations", "chat_history", "user_sessions"]:
+                        try:
+                            self.supabase.table(table_name).delete().eq("session_id", session_id).execute()
+                            logger.info(f"☢️ Data deleted from {table_name} table")
+                        except:
+                            pass  # Table might not exist
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not delete from additional tables: {e}")
+                    
+            except Exception as e:
+                logger.error(f"❌ Failed to delete session {session_id} from database: {e}")
+        
+        # 3. Force create a completely fresh session
+        self.sessions[session_id] = UserInfo()
+        logger.info(f"☢️ Fresh UserInfo created for session {session_id}")
+        
+        logger.info(f"☢️ NUCLEAR RESET COMPLETE for session {session_id} - completely fresh start")
+    
     def force_refresh_telegram_session(self, session_id: str) -> None:
         """Force refresh Telegram session from database (for memory sync issues)"""
         if not self._is_telegram_session(session_id):

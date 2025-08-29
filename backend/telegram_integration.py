@@ -145,14 +145,22 @@ async def telegram_webhook(request: Request):
             logger.warning(f"⚠️ Failed to send typing indicator: {typing_error}")
         
         # Check for special commands first (BEFORE loading conversation history)
-        if text.lower().strip() in ["delete history", "clear history", "reset", "start over", "delete my data", "delete data", "clear data", "remove data"]:
-            # Force delete all session data for this user
+        if text.lower().strip() in ["delete history", "clear history", "reset", "start over", "delete my data", "delete data", "clear data", "remove data", "nuclear reset", "start fresh", "new conversation"]:
+            # NUCLEAR RESET - clear EVERYTHING for this user
             if MEMORY_IMPORTS_AVAILABLE and get_session_memory():
                 try:
                     memory = get_session_memory()
-                    # Force refresh from database and clear
-                    memory.clear_session_data(session_id)
-                    logger.info(f"🗑️ User {user_id} requested history deletion - session cleared")
+                    
+                    # Use nuclear reset for complete fresh start
+                    if text.lower().strip() in ["nuclear reset", "start fresh", "new conversation"]:
+                        memory.nuclear_reset_session(session_id)
+                        logger.info(f"☢️ User {user_id} requested NUCLEAR RESET - complete fresh start")
+                        response_text = "☢️ NUCLEAR RESET COMPLETE! All data has been completely wiped. This is a completely fresh start - I have no memory of any previous conversations. How can I help you with student visa information?"
+                    else:
+                        # Regular clear for other commands
+                        memory.clear_session_data(session_id)
+                        logger.info(f"🗑️ User {user_id} requested history deletion - session cleared")
+                        response_text = "Your conversation history has been cleared. How can I help you with student visa information?"
                     
                     # CRITICAL: Force empty conversation history
                     conversation_history = []
@@ -160,7 +168,7 @@ async def telegram_webhook(request: Request):
                     
                     result = {
                         "success": True,
-                        "response": "Your conversation history has been cleared. How can I help you with student visa information?"
+                        "response": response_text
                     }
                 except Exception as e:
                     logger.error(f"❌ Failed to clear session data: {e}")

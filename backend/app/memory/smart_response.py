@@ -756,6 +756,10 @@ Focus on providing helpful visa information and guidance instead.
                 role = msg.get('role', 'user')
                 content = msg.get('content', msg.get('user_message', msg.get('user_input', '')))
                 conversation_context += f"{i}. {role.title()}: {content}\n"
+        else:
+            # CRITICAL: FRESH START - no conversation history
+            conversation_context = "\nRECENT CONVERSATION: NONE - This is a completely fresh conversation. User has no previous interaction history.\n"
+            logger.info(f"🆕 FRESH START: No conversation history - forcing completely fresh LLM context")
         
         # ✅ RESTORED: Lead table data is essential for LLM to see what's already saved
         # This prevents the LLM from asking for information already provided
