@@ -32,6 +32,9 @@ logger = logging.getLogger(__name__)
 # Track users waiting for responses (prevent double question sending)
 users_waiting_for_response = set()
 
+# Track recent messages to prevent duplicates (module-level variable)
+recent_messages = {}
+
 # Telegram message models
 class TelegramMessage(BaseModel):
     message_id: int
@@ -121,16 +124,18 @@ async def telegram_webhook(request: Request):
         # Check if this is a duplicate message (same text, same user, within 5 seconds)
         current_time = time.time()
         message_key = f"{user_id}_{text}"
-        if hasattr(telegram_webhook, 'recent_messages') and message_key in telegram_webhook.recent_messages:
-            last_time = telegram_webhook.recent_messages[message_key]
+        if message_key in recent_messages:
+            last_time = recent_messages[message_key]
             if current_time - last_time < 5:  # Within 5 seconds
                 logger.info(f"⏳ Duplicate message detected for user {user_id} within 5 seconds - ignoring")
                 return {"ok": True}
         
         # Store this message to prevent duplicates
-        if not hasattr(telegram_webhook, 'recent_messages'):
-            telegram_webhook.recent_messages = {}
-        telegram_webhook.recent_messages[message_key] = current_time
+        recent_messages[message_key] = current_time
+        
+        # Clean up old messages (older than 1 minute) to prevent memory bloat
+        cleanup_time = current_time - 60
+        recent_messages = {k: v for k, v in recent_messages.items() if v > cleanup_time}
         
         # Mark user as waiting for response
         users_waiting_for_response.add(user_id)
