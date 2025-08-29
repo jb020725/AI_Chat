@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 AI Chatbot Backend - Main Application
 - Receives user messages
@@ -40,7 +40,7 @@ def safe_import(module_name: str, fallback=None):
         module = __import__(module_name)
         return module
     except Exception as e:
-        print(f"⚠️ Warning: Could not import {module_name}: {e}")
+        print(f"?? Warning: Could not import {module_name}: {e}")
         return fallback
 
 # Import centralized utilities with safe fallback
@@ -50,7 +50,7 @@ try:
     PATHS_AVAILABLE = True
     LOGGING_AVAILABLE = True
 except Exception as e:
-    print(f"⚠️ Warning: Core utilities not available: {e}")
+    print(f"?? Warning: Core utilities not available: {e}")
     PATHS_AVAILABLE = False
     LOGGING_AVAILABLE = False
     # Create minimal fallback
@@ -68,7 +68,7 @@ try:
     from app.config import settings
     CONFIG_AVAILABLE = True
 except Exception as e:
-    print(f"⚠️ Warning: Configuration not available: {e}")
+    print(f"?? Warning: Configuration not available: {e}")
     CONFIG_AVAILABLE = False
     # Create minimal settings for basic functionality
     class MinimalSettings:
@@ -95,9 +95,9 @@ except Exception as e:
 try:
     from telegram_integration import telegram_router
     TELEGRAM_AVAILABLE = True
-    print("✅ Telegram integration loaded successfully")
+    print("? Telegram integration loaded successfully")
 except Exception as e:
-    print(f"⚠️ Warning: Telegram integration not available: {e}")
+    print(f"?? Warning: Telegram integration not available: {e}")
     TELEGRAM_AVAILABLE = False
     # Create minimal router for graceful degradation
     from fastapi import APIRouter
@@ -113,7 +113,7 @@ try:
     from app.memory.api import router as memory_router
     MEMORY_AVAILABLE = True
 except Exception as e:
-    print(f"⚠️ Warning: Memory system not available: {e}")
+    print(f"?? Warning: Memory system not available: {e}")
     MEMORY_AVAILABLE = False
     # Create minimal fallback functions
     def get_session_memory():
@@ -128,7 +128,7 @@ try:
     from app.tools.lead_capture_tool import LeadCaptureTool
     LEAD_CAPTURE_AVAILABLE = True
 except Exception as e:
-    print(f"⚠️ Warning: Lead capture tool not available: {e}")
+    print(f"?? Warning: Lead capture tool not available: {e}")
     LEAD_CAPTURE_AVAILABLE = False
     LeadCaptureTool = None
 
@@ -137,7 +137,7 @@ try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
 except Exception as e:
-    print(f"⚠️ Warning: Gemini not available: {e}")
+    print(f"?? Warning: Gemini not available: {e}")
     GEMINI_AVAILABLE = False
     genai = None
 
@@ -151,7 +151,7 @@ try:
         )
     logger = logging.getLogger(__name__)
 except Exception as e:
-    print(f"⚠️ Warning: Advanced logging not available: {e}")
+    print(f"?? Warning: Advanced logging not available: {e}")
     # Basic logging fallback
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
@@ -168,26 +168,26 @@ if GEMINI_AVAILABLE and hasattr(settings, 'GEMINI_API_KEY') and settings.GEMINI_
     try:
         genai.configure(api_key=settings.GEMINI_API_KEY)
         model = genai.GenerativeModel('gemini-2.5-flash')
-        logger.info("✅ Gemini 2.5 Flash initialized for AI Consultancy chatbot")
+        logger.info("? Gemini 2.5 Flash initialized for AI Consultancy chatbot")
     except Exception as e:
-        logger.error(f"❌ Failed to initialize Gemini: {e}")
+        logger.error(f"? Failed to initialize Gemini: {e}")
         GEMINI_AVAILABLE = False
         model = None
 else:
-    logger.warning("⚠️ Gemini not available - API key missing or system unavailable")
+    logger.warning("?? Gemini not available - API key missing or system unavailable")
 
 # Initialize Lead Capture Tool with safe fallback
 lead_capture_tool = None
 if LEAD_CAPTURE_AVAILABLE and LeadCaptureTool:
     try:
         lead_capture_tool = LeadCaptureTool()
-        logger.info("✅ Lead Capture Tool initialized successfully")
+        logger.info("? Lead Capture Tool initialized successfully")
     except Exception as e:
-        logger.error(f"❌ Failed to initialize Lead Capture Tool: {e}")
+        logger.error(f"? Failed to initialize Lead Capture Tool: {e}")
         LEAD_CAPTURE_AVAILABLE = False
         lead_capture_tool = None
 else:
-    logger.warning("⚠️ Lead Capture Tool not available")
+    logger.warning("?? Lead Capture Tool not available")
 
 # Concurrency Control - Updated for Gemini 2.5 Flash
 llm_semaphore = asyncio.Semaphore(20)  # Max 20 concurrent LLM calls (doubled for 2.5)
@@ -290,10 +290,10 @@ app = FastAPI(title="AI Consultancy AI Assistant - Simple Chatbot", version="3.0
 @app.on_event("startup")
 async def startup_event():
     """Log startup information"""
-    logger.info("🚀 FastAPI app starting up...")
-    logger.info(f"🌐 App will listen on port: {os.getenv('PORT', '8080')}")
-    logger.info(f"🔧 Environment: {os.getenv('ENVIRONMENT', 'development')}")
-    logger.info("✅ FastAPI app startup completed!")
+    logger.info("?? FastAPI app starting up...")
+    logger.info(f"?? App will listen on port: {os.getenv('PORT', '8080')}")
+    logger.info(f"?? Environment: {os.getenv('ENVIRONMENT', 'development')}")
+    logger.info("? FastAPI app startup completed!")
 
 # Add CORS middleware
 app.add_middleware(
@@ -349,15 +349,15 @@ async def chat(request: Request, chat_request: ChatRequest):
         # Generate smart response using simple chatbot (this handles extraction)
         if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
             try:
-                logger.info(f"🔍 DEBUG: Starting smart response generation for message: '{chat_request.message[:100]}...'")
+                logger.info(f"?? DEBUG: Starting smart response generation for message: '{chat_request.message[:100]}...'")
                 
                 # Set the LLM model in the smart response system
-                logger.info("🔍 DEBUG: About to set LLM model in smart response system...")
+                logger.info("?? DEBUG: About to set LLM model in smart response system...")
                 get_smart_response().set_llm_model(model)
                 logger.info("LLM model set in smart response system for simple chatbot")
                 
                 # Get conversation history
-                logger.info("🔍 DEBUG: About to get conversation history...")
+                logger.info("?? DEBUG: About to get conversation history...")
                 memory = get_session_memory()
                 conversation_context = memory.get_conversation_context(session_id)
                 conversation_history = conversation_context.get("conversation_history", [])
@@ -365,19 +365,19 @@ async def chat(request: Request, chat_request: ChatRequest):
                 
                 # Use concurrency control for LLM calls
                 async with llm_semaphore:
-                    logger.info(f"🔍 DEBUG: About to call get_smart_response().generate_smart_response")
-                    logger.info(f"🔍 DEBUG: Message: '{chat_request.message[:100]}...'")
-                    logger.info(f"🔍 DEBUG: Session ID: {session_id}")
-                    logger.info(f"🔍 DEBUG: Conversation history length: {len(conversation_history)}")
+                    logger.info(f"?? DEBUG: About to call get_smart_response().generate_smart_response")
+                    logger.info(f"?? DEBUG: Message: '{chat_request.message[:100]}...'")
+                    logger.info(f"?? DEBUG: Session ID: {session_id}")
+                    logger.info(f"?? DEBUG: Conversation history length: {len(conversation_history)}")
                     
                     smart_response_instance = get_smart_response()
                     smart_response_instance.set_llm_model(model)
-                    logger.info("🔍 DEBUG: About to call generate_smart_response...")
+                    logger.info("?? DEBUG: About to call generate_smart_response...")
                     result = smart_response_instance.generate_smart_response(
                         chat_request.message, session_id, conversation_history
                     )
                     
-                    logger.info(f"🔍 DEBUG: smart_response result: {result}")
+                    logger.info(f"?? DEBUG: smart_response result: {result}")
                 
                 # Extract response from result
                 if result.get('success'):
@@ -402,14 +402,14 @@ async def chat(request: Request, chat_request: ChatRequest):
                     logger.warning(f"Failed to track conversation exchange: {e}")
                     
             except Exception as e:
-                logger.error(f"🔍 DEBUG: Error in smart response generation: {e}")
+                logger.error(f"?? DEBUG: Error in smart response generation: {e}")
                 import traceback
-                logger.error(f"🔍 DEBUG: Traceback: {traceback.format_exc()}")
+                logger.error(f"?? DEBUG: Traceback: {traceback.format_exc()}")
                 ai_response = "I'm having technical difficulties. Please try again."
                 
         else:
             # Fallback to basic response
-            logger.warning(f"🔍 DEBUG: Memory or Gemini not available. MEMORY={MEMORY_AVAILABLE}, GEMINI={GEMINI_AVAILABLE}")
+            logger.warning(f"?? DEBUG: Memory or Gemini not available. MEMORY={MEMORY_AVAILABLE}, GEMINI={GEMINI_AVAILABLE}")
             ai_response = "I can help you with student visa information for USA, UK, Australia, and South Korea. Please share your contact details and preferred country for personalized guidance."
         
         return ChatResponse(
@@ -569,7 +569,7 @@ async def get_status():
         }
     }
 
-# ⚠️ DEPRECATED: Session close endpoints removed - emails now sent automatically when leads complete
+# ?? DEPRECATED: Session close endpoints removed - emails now sent automatically when leads complete
 # The new smart email system triggers emails based on lead completeness, not session closure
 
 @app.post("/api/test-lead-creation")
@@ -581,7 +581,7 @@ async def test_lead_creation(test_data: dict):
         session_id = test_data.get("session_id", "test_session_123")
         lead_data = test_data.get("lead_data", {})
         
-        logger.info(f"🧪 TEST LEAD CREATION: Session {session_id}, Data: {lead_data}")
+        logger.info(f"?? TEST LEAD CREATION: Session {session_id}, Data: {lead_data}")
         
         # Get the lead capture tool
         from app.tools.lead_capture_tool import LeadCaptureTool
@@ -605,14 +605,14 @@ async def test_lead_creation(test_data: dict):
         # Create test lead
         result = lead_tool.create_lead(lead_data)
         
-        logger.info(f"🧪 TEST LEAD CREATION RESULT: {result}")
+        logger.info(f"?? TEST LEAD CREATION RESULT: {result}")
         
         return result
         
     except Exception as e:
-        logger.error(f"🧪 TEST LEAD CREATION ERROR: {str(e)}")
+        logger.error(f"?? TEST LEAD CREATION ERROR: {str(e)}")
         import traceback
-        logger.error(f"🧪 TEST LEAD CREATION TRACEBACK: {traceback.format_exc()}")
+        logger.error(f"?? TEST LEAD CREATION TRACEBACK: {traceback.format_exc()}")
         return {
             "success": False,
             "error": f"Test lead creation failed: {str(e)}"
@@ -626,37 +626,37 @@ def initialize_memory_system():
     if MEMORY_AVAILABLE and GEMINI_AVAILABLE and callable(get_smart_response):
         try:
             # Initialize the smart response system for simple chatbot
-            logger.info("🔄 About to set LLM model in smart response system...")
+            logger.info("?? About to set LLM model in smart response system...")
             smart_response_instance = get_smart_response()
             if smart_response_instance:
                 smart_response_instance.set_llm_model(model)
-                logger.info("✅ Memory system initialized with LLM model for simple chatbot")
+                logger.info("? Memory system initialized with LLM model for simple chatbot")
                 
                 # Verify the integration
                 if smart_response_instance.llm_model:
-                    logger.info("✅ Simple chatbot successfully connected to smart response system")
+                    logger.info("? Simple chatbot successfully connected to smart response system")
                 else:
-                    logger.error("❌ Simple chatbot failed to connect to smart response system")
+                    logger.error("? Simple chatbot failed to connect to smart response system")
                     logger.error(f"LLM model status: {smart_response_instance.llm_model}")
             else:
-                logger.warning("⚠️ Smart response instance not available")
+                logger.warning("?? Smart response instance not available")
                 
         except Exception as e:
-            logger.error(f"❌ Failed to initialize memory system with LLM: {e}")
+            logger.error(f"? Failed to initialize memory system with LLM: {e}")
             import traceback
-            logger.error(f"❌ Traceback: {traceback.format_exc()}")
+            logger.error(f"? Traceback: {traceback.format_exc()}")
             MEMORY_AVAILABLE = False
     else:
-        logger.warning("⚠️ Memory system or LLM not available for clean function calling integration")
+        logger.warning("?? Memory system or LLM not available for clean function calling integration")
 
 # Call initialization function
 initialize_memory_system()
 
 # Add startup logging for debugging
-logger.info("🚀 Backend startup sequence completed successfully!")
-logger.info(f"📊 System Status: MEMORY={MEMORY_AVAILABLE}, GEMINI={GEMINI_AVAILABLE}, TELEGRAM={TELEGRAM_AVAILABLE}")
-logger.info(f"🌐 App will listen on port: {os.getenv('PORT', '8080')}")
-logger.info("✅ All systems ready - FastAPI app should start successfully")
+logger.info("?? Backend startup sequence completed successfully!")
+logger.info(f"?? System Status: MEMORY={MEMORY_AVAILABLE}, GEMINI={GEMINI_AVAILABLE}, TELEGRAM={TELEGRAM_AVAILABLE}")
+logger.info(f"?? App will listen on port: {os.getenv('PORT', '8080')}")
+logger.info("? All systems ready - FastAPI app should start successfully")
 
 # Add system health check
 def check_system_health():
@@ -672,15 +672,15 @@ def check_system_health():
         "model_available": model is not None
     }
     
-    logger.info(f"🏥 System Health Check: {health_status}")
+    logger.info(f"?? System Health Check: {health_status}")
     
     # Log any critical issues
     if not CONFIG_AVAILABLE:
-        logger.warning("⚠️ CRITICAL: Configuration system not available")
+        logger.warning("?? CRITICAL: Configuration system not available")
     if not GEMINI_AVAILABLE:
-        logger.warning("⚠️ CRITICAL: Gemini AI not available")
+        logger.warning("?? CRITICAL: Gemini AI not available")
     if not MEMORY_AVAILABLE:
-        logger.warning("⚠️ CRITICAL: Memory system not available")
+        logger.warning("?? CRITICAL: Memory system not available")
     
     return health_status
 
@@ -753,5 +753,3 @@ if __name__ == "__main__":
     )
 
 
-#   F o r c e   r e s t a r t  
- 
