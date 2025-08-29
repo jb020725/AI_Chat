@@ -150,7 +150,22 @@ async def telegram_webhook(request: Request):
             logger.warning(f"⚠️ Failed to send typing indicator: {typing_error}")
         
         # Check for special commands first (BEFORE loading conversation history)
-        if text.lower().strip() in ["delete history", "clear history", "reset", "start over", "delete my data", "delete data", "clear data", "remove data", "nuclear reset", "start fresh", "new conversation"]:
+        if text.lower().strip() in ["/start"]:
+            # Handle /start command with welcome message
+            response_text = "Hello! Welcome to our student visa consultancy. I'm here to help you with information about student visas for USA, UK, Australia, and South Korea. How can I assist you today?"
+            
+            result = {
+                "success": True,
+                "response": response_text
+            }
+            
+            # Return immediately after start command
+            logger.info(f"🚀 User {user_id} started the bot")
+            users_waiting_for_response.discard(user_id)
+            logger.info(f"✅ User {user_id} removed from waiting list after start command")
+            return format_telegram_response(result["response"])
+            
+        elif text.lower().strip() in ["delete history", "clear history", "reset", "start over", "delete my data", "delete data", "clear data", "remove data", "delete my info", "delete info", "nuclear reset", "start fresh", "new conversation"]:
             # NUCLEAR RESET - clear EVERYTHING for this user
             if MEMORY_IMPORTS_AVAILABLE and get_session_memory():
                 try:
