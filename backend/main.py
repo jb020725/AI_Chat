@@ -349,11 +349,15 @@ async def chat(request: Request, chat_request: ChatRequest):
         # Generate smart response using simple chatbot (this handles extraction)
         if MEMORY_AVAILABLE and GEMINI_AVAILABLE:
             try:
+                logger.info(f"🔍 DEBUG: Starting smart response generation for message: '{chat_request.message[:100]}...'")
+                
                 # Set the LLM model in the smart response system
+                logger.info("🔍 DEBUG: About to set LLM model in smart response system...")
                 get_smart_response().set_llm_model(model)
                 logger.info("LLM model set in smart response system for simple chatbot")
                 
                 # Get conversation history
+                logger.info("🔍 DEBUG: About to get conversation history...")
                 memory = get_session_memory()
                 conversation_context = memory.get_conversation_context(session_id)
                 conversation_history = conversation_context.get("conversation_history", [])
@@ -368,6 +372,7 @@ async def chat(request: Request, chat_request: ChatRequest):
                     
                     smart_response_instance = get_smart_response()
                     smart_response_instance.set_llm_model(model)
+                    logger.info("🔍 DEBUG: About to call generate_smart_response...")
                     result = smart_response_instance.generate_smart_response(
                         chat_request.message, session_id, conversation_history
                     )
@@ -404,6 +409,7 @@ async def chat(request: Request, chat_request: ChatRequest):
                 
         else:
             # Fallback to basic response
+            logger.warning(f"🔍 DEBUG: Memory or Gemini not available. MEMORY={MEMORY_AVAILABLE}, GEMINI={GEMINI_AVAILABLE}")
             ai_response = "I can help you with student visa information for USA, UK, Australia, and South Korea. Please share your contact details and preferred country for personalized guidance."
         
         return ChatResponse(
@@ -680,6 +686,60 @@ def check_system_health():
 
 # Run health check
 system_health = check_system_health()
+
+@app.get("/api/debug")
+async def debug_system():
+    """Debug endpoint to see what's working and what's not"""
+    try:
+        # Test each component individually
+        debug_info = {
+            "timestamp": datetime.now().isoformat(),
+            "system_status": {
+                "memory_available": MEMORY_AVAILABLE,
+                "gemini_available": GEMINI_AVAILABLE,
+                "telegram_available": TELEGRAM_AVAILABLE,
+                "lead_capture_available": LEAD_CAPTURE_AVAILABLE
+            },
+            "llm_status": {
+                "model_available": model is not None,
+                "model_type": str(type(model)) if model else "None"
+            },
+            "memory_test": "Not tested yet",
+            "smart_response_test": "Not tested yet"
+        }
+        
+        # Test memory system
+        try:
+            if MEMORY_AVAILABLE:
+                memory = get_session_memory()
+                debug_info["memory_test"] = f"Memory system: {type(memory)} - Available"
+            else:
+                debug_info["memory_test"] = "Memory system: Not available"
+        except Exception as e:
+            debug_info["memory_test"] = f"Memory system: ERROR - {str(e)}"
+        
+        # Test smart response system
+        try:
+            if MEMORY_AVAILABLE:
+                smart_response = get_smart_response()
+                if smart_response:
+                    debug_info["smart_response_test"] = f"Smart response: {type(smart_response)} - Available"
+                else:
+                    debug_info["smart_response_test"] = "Smart response: None returned"
+            else:
+                debug_info["smart_response_test"] = "Smart response: Memory not available"
+        except Exception as e:
+            debug_info["smart_response_test"] = f"Smart response: ERROR - {str(e)}"
+            import traceback
+            debug_info["smart_response_traceback"] = traceback.format_exc()
+        
+        return debug_info
+        
+    except Exception as e:
+        return {
+            "error": f"Debug endpoint failed: {str(e)}",
+            "traceback": traceback.format_exc()
+        }
 
 if __name__ == "__main__":
     # Run the FastAPI app
