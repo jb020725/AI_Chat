@@ -115,3 +115,93 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Mobile-specific improvements */
+@layer utilities {
+  /* Prevent text selection on mobile */
+  .no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  /* Better mobile touch targets */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Smooth mobile scrolling */
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Mobile keyboard handling */
+  .mobile-input {
+    font-size: 16px; /* Prevents zoom on iOS */
+    line-height: 1.2;
+  }
+  
+  /* Mobile message bubbles */
+  .mobile-message {
+    max-width: 95%;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  
+  /* Mobile input container */
+  .mobile-input-container {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    border-top: 1px solid #e5e7eb;
+    z-index: 50;
+  }
+  
+  /* Mobile header */
+  .mobile-header {
+    position: sticky;
+    top: 0;
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    z-index: 40;
+  }
+  
+  /* Mobile animations */
+  .mobile-fade-in {
+    animation: mobileFadeIn 0.3s ease-out;
+  }
+  
+  @keyframes mobileFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Mobile focus states */
+  .mobile-focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+  
+  /* Mobile loading states */
+  .mobile-loading {
+    animation: mobilePulse 1.5s ease-in-out infinite;
+  }
+  
+  @keyframes mobilePulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.6;
+    }
+  }
+}

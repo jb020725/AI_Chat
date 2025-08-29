@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Bot, User, Sparkles } from "lucide-react";
+import { Send, Sparkles, Search, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { sendMessage } from "@/lib/api";
 
@@ -16,7 +16,7 @@ interface Message {
 
 export const ChatBox = () => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [inputMessage, setInputMessage] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -32,18 +32,23 @@ export const ChatBox = () => {
     setMessages([welcomeMessage]);
   }, []);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom with smooth animation
   useEffect(() => {
     if (scrollAreaRef.current) {
       const viewport = scrollAreaRef.current.querySelector(
         '[data-radix-scroll-area-viewport]'
       ) as HTMLElement | null;
-      if (viewport) viewport.scrollTop = viewport.scrollHeight;
+      if (viewport) {
+        viewport.scrollTo({
+          top: viewport.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
     }
-  }, [messages]);
+  }, [messages, isProcessing]);
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isTyping) return;
+    if (!inputMessage.trim() || isProcessing) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -54,7 +59,7 @@ export const ChatBox = () => {
 
     setMessages((prev) => [...prev, userMessage]);
     setInputMessage("");
-    setIsTyping(true);
+    setIsProcessing(true);
 
     try {
       const data = await sendMessage(userMessage.text);
@@ -76,8 +81,8 @@ export const ChatBox = () => {
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
-      setIsTyping(false);
-      // Restore focus to the textarea after sending message
+      setIsProcessing(false);
+      // Keep focus on textarea for smooth UX
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.focus();
@@ -94,24 +99,21 @@ export const ChatBox = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Header */}
-      <div className="flex-none bg-white/80 backdrop-blur-sm border-b border-slate-200 px-6 py-4">
-        <div className="flex items-center justify-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-white" />
+    <div className="flex flex-col h-screen bg-white">
+      {/* Header - Clean and minimal */}
+      <div className="flex-none bg-white border-b border-gray-100 px-4 py-3 sm:px-6">
+        <div className="flex items-center justify-center space-x-2">
+          <div className="w-7 h-7 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+            <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <h1 className="text-xl font-semibold text-slate-800">Student Visa AI</h1>
+          <h1 className="text-lg font-semibold text-gray-900">Student Visa AI</h1>
         </div>
-        <p className="text-center text-sm text-slate-600 mt-1">
-          Powered by AI • USA • Canada • UK • South Korea • Australia
-        </p>
       </div>
 
-      {/* Messages */}
+      {/* Messages - Full width, mobile optimized */}
       <div className="flex-1 overflow-hidden">
         <ScrollArea ref={scrollAreaRef} className="h-full">
-          <div className="px-6 py-4 space-y-6">
+          <div className="px-4 py-4 space-y-4 sm:px-6">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -120,56 +122,34 @@ export const ChatBox = () => {
                   message.isUser ? "justify-end" : "justify-start"
                 )}
               >
-                <div className="flex items-start space-x-3 max-w-[80%]">
-                  {!message.isUser && (
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Bot className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-
+                <div className={cn(
+                  "max-w-[90%] sm:max-w-[80%] lg:max-w-[70%]",
+                  message.isUser ? "text-right" : "text-left"
+                )}>
                   <div
                     className={cn(
-                      "rounded-2xl px-4 py-3 shadow-sm",
+                      "rounded-2xl px-4 py-3 shadow-sm transition-all duration-200",
                       message.isUser
-                        ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-br-md"
-                        : "bg-white text-slate-800 rounded-bl-md border border-slate-200"
+                        ? "bg-blue-600 text-white ml-auto rounded-br-md"
+                        : "bg-gray-50 text-gray-900 rounded-bl-md border border-gray-100"
                     )}
                   >
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
-                    <p
-                      className={cn(
-                        "text-xs mt-2 opacity-70",
-                        message.isUser ? "text-blue-100" : "text-slate-500"
-                      )}
-                    >
-                      {message.timestamp.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                    <p className="text-sm sm:text-base leading-relaxed whitespace-pre-wrap break-words">
+                      {message.text}
                     </p>
                   </div>
-
-                  {message.isUser && (
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <User className="w-4 h-4 text-white" />
-                    </div>
-                  )}
                 </div>
               </div>
             ))}
 
-            {/* Typing indicator */}
-            {isTyping && (
+            {/* Processing indicator - ChatGPT-like */}
+            {isProcessing && (
               <div className="flex justify-start">
-                <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                    <Bot className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="bg-white rounded-2xl rounded-bl-md px-4 py-3 border border-slate-200">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" />
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-100" />
-                      <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-200" />
+                <div className="max-w-[90%] sm:max-w-[80%] lg:max-w-[70%]">
+                  <div className="bg-gray-50 rounded-2xl rounded-bl-md px-4 py-3 border border-gray-100">
+                    <div className="flex items-center space-x-2 text-gray-600">
+                      <Search className="w-4 h-4 animate-pulse" />
+                      <span className="text-sm">Gathering information...</span>
                     </div>
                   </div>
                 </div>
@@ -179,8 +159,8 @@ export const ChatBox = () => {
         </ScrollArea>
       </div>
 
-      {/* Input */}
-      <div className="flex-none bg-white/80 backdrop-blur-sm border-t border-slate-200 px-6 py-4">
+      {/* Input - Mobile optimized, always enabled */}
+      <div className="flex-none bg-white border-t border-gray-100 px-4 py-3 sm:px-6">
         <div className="flex items-end space-x-3">
           <Textarea
             ref={textareaRef}
@@ -188,16 +168,25 @@ export const ChatBox = () => {
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask about student visas, requirements, or application processes..."
-            disabled={isTyping}
-            className="min-h-[44px] max-h-32 resize-none border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+            disabled={false} // Always enabled for smooth UX
+            className="min-h-[44px] max-h-32 resize-none border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm rounded-xl transition-all duration-200"
           />
           <Button
             onClick={handleSendMessage}
-            disabled={isTyping || !inputMessage.trim()}
+            disabled={isProcessing || !inputMessage.trim()}
             size="icon"
-            className="h-11 w-11 shrink-0 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+            className={cn(
+              "h-11 w-11 shrink-0 rounded-xl transition-all duration-200",
+              isProcessing || !inputMessage.trim()
+                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md"
+            )}
           >
-            <Send className="h-4 w-4" />
+            {isProcessing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </div>

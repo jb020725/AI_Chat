@@ -1,42 +1,121 @@
+/* Mobile-optimized chat interface styles */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  height: 100vh;
+  overflow: hidden;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
+/* Mobile-first responsive design */
+@media (max-width: 640px) {
+  .chat-container {
+    padding: 0.5rem;
   }
-  to {
-    transform: rotate(360deg);
+  
+  .message-bubble {
+    max-width: 95%;
+    font-size: 0.875rem;
+    line-height: 1.4;
   }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+  
+  .input-container {
+    padding: 0.75rem;
+  }
+  
+  .send-button {
+    height: 2.75rem;
+    width: 2.75rem;
   }
 }
 
-.card {
-  padding: 2em;
+/* Smooth transitions and animations */
+.message-enter {
+  opacity: 0;
+  transform: translateY(10px);
 }
 
-.read-the-docs {
-  color: #888;
+.message-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 200ms ease-in, transform 200ms ease-out;
+}
+
+/* Mobile touch optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .send-button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .textarea-input {
+    min-height: 44px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .chat-container {
+    background-color: #1a1a1a;
+    color: #ffffff;
+  }
+  
+  .message-bubble.user {
+    background-color: #2563eb;
+  }
+  
+  .message-bubble.assistant {
+    background-color: #374151;
+    border-color: #4b5563;
+  }
+}
+
+/* Focus states for accessibility */
+.send-button:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.textarea-input:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Loading states */
+.processing-indicator {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Smooth scrolling */
+.scroll-container {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile keyboard handling */
+@media (max-height: 500px) {
+  .chat-container {
+    height: 100vh;
+  }
+  
+  .input-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid #e5e7eb;
+    z-index: 50;
+  }
 }
