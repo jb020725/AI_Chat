@@ -8,47 +8,48 @@ on:
     branches: [ main ]
 
 jobs:
-  deploy-backend:
-    name: Deploy Backend to Cloud Run
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Authenticate to Google Cloud
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.GCP_SA_KEY }}
-        project_id: ${{ secrets.GCP_PROJECT_ID }}
-    
-    - name: Setup Google Cloud CLI
-      uses: google-github-actions/setup-gcloud@v2
-      with:
-        project_id: ${{ secrets.GCP_PROJECT_ID }}
-    
-    - name: Verify Authentication
-      run: |
-        gcloud auth list
-        gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
-        gcloud config get-value project
-    
-    - name: Configure Docker for GCR
-      run: |
-        gcloud auth configure-docker
-        gcloud auth list
-    
-    - name: Deploy Backend to Cloud Run
-      run: |
-        gcloud run deploy ai-chatbot-backend \
-          --source ./backend \
-          --platform managed \
-          --region us-central1 \
-          --allow-unauthenticated \
-          --memory 2Gi \
-          --cpu 1 \
-          --max-instances 10 \
-          --set-env-vars="ENVIRONMENT=production,GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }},GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},SUPABASE_URL=${{ secrets.SUPABASE_URL }},SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }},SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }},SMTP_SERVER=${{ secrets.SMTP_SERVER }},SMTP_PORT=${{ secrets.SMTP_PORT }},SMTP_USERNAME=${{ secrets.SMTP_USERNAME }},SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }},FROM_EMAIL=${{ secrets.FROM_EMAIL }},FROM_NAME='${{ secrets.FROM_NAME }}',ENABLE_EMAIL_NOTIFICATIONS=${{ secrets.ENABLE_EMAIL_NOTIFICATIONS }},LEAD_NOTIFICATION_EMAIL=${{ secrets.LEAD_NOTIFICATION_EMAIL }},ENABLE_LEAD_NOTIFICATIONS=${{ secrets.ENABLE_LEAD_NOTIFICATIONS }},TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }},ENABLE_TELEGRAM=true,TELEGRAM_WEBHOOK_URL=${{ secrets.TELEGRAM_WEBHOOK_URL }},WEBHOOK_BASE_URL=${{ secrets.WEBHOOK_BASE_URL }}"
+  # BACKEND DEPLOYMENT DISABLED - Keeping stable version 00095
+  # deploy-backend:
+  #   name: Deploy Backend to Cloud Run
+  #   runs-on: ubuntu-latest
+  #   
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
+  #   
+  #   - name: Authenticate to Google Cloud
+  #     uses: google-github-actions/auth@v2
+  #     with:
+  #       credentials_json: ${{ secrets.GCP_SA_KEY }}
+  #       project_id: ${{ secrets.GCP_PROJECT_ID }}
+  #   
+  #   - name: Setup Google Cloud CLI
+  #     uses: google-github-actions/setup-gcloud@v2
+  #     with:
+  #       project_id: ${{ secrets.GCP_PROJECT_ID }}
+  #   
+  #   - name: Verify Authentication
+  #     run: |
+  #       gcloud auth list
+  #       gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
+  #       gcloud config get-value project
+  #   
+  #   - name: Configure Docker for GCR
+  #     run: |
+  #       gcloud auth configure-docker
+  #       gcloud auth list
+  #   
+  #   - name: Deploy Backend to Cloud Run
+  #     run: |
+  #       gcloud run deploy ai-chatbot-backend \
+  #         --source ./backend \
+  #         --platform managed \
+  #         --region us-central1 \
+  #         --allow-unauthenticated \
+  #         --memory 2Gi \
+  #         --cpu 1 \
+  #         --max-instances 10 \
+  #         --set-env-vars="ENVIRONMENT=production,GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }},GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},SUPABASE_URL=${{ secrets.SUPABASE_URL }},SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }},SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }},SMTP_SERVER=${{ secrets.SMTP_SERVER }},SMTP_PORT=${{ secrets.SMTP_PORT }},SMTP_USERNAME=${{ secrets.SMTP_USERNAME }},SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }},FROM_EMAIL=${{ secrets.FROM_EMAIL }},FROM_NAME='${{ secrets.FROM_NAME }}',ENABLE_EMAIL_NOTIFICATIONS=${{ secrets.ENABLE_EMAIL_NOTIFICATIONS }},LEAD_NOTIFICATION_EMAIL=${{ secrets.LEAD_NOTIFICATION_EMAIL }},ENABLE_LEAD_NOTIFICATIONS=${{ secrets.ENABLE_LEAD_NOTIFICATIONS }},TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }},ENABLE_TELEGRAM=true,TELEGRAM_WEBHOOK_URL=${{ secrets.TELEGRAM_WEBHOOK_URL }},WEBHOOK_BASE_URL=${{ secrets.WEBHOOK_BASE_URL }}"
 
   deploy-frontend:
     name: Deploy Frontend to Cloud Run
