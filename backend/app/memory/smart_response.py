@@ -115,6 +115,34 @@ class SmartResponse:
                 "error": str(e)
             }
 
+    def _background_database_operations(self, session_id: str, contact_info: Dict[str, str], user_message: str, ai_response: str):
+        """Run database operations in the background without blocking the response"""
+        try:
+            logger.info(f"🚀 BACKGROUND DB OPERATIONS STARTED for session {session_id}")
+            
+            # 1. Update session memory with extracted contact info
+            if contact_info:
+                self._update_session_memory_with_contact_info(session_id, contact_info)
+                logger.info(f"✅ Background: Session memory updated with contact info")
+            
+            # 2. Update session memory with conversation exchange
+            self._update_session_memory_with_exchange(session_id, user_message, ai_response)
+            logger.info(f"✅ Background: Conversation exchange tracked")
+            
+            # 3. Detect and save lead (this includes database operations)
+            lead_saved = self._detect_and_save_lead(user_message, session_id, contact_info)
+            if lead_saved:
+                logger.info(f"✅ Background: Lead saved/updated successfully")
+            else:
+                logger.info(f"ℹ️ Background: No lead action needed")
+            
+            logger.info(f"✅ BACKGROUND DB OPERATIONS COMPLETED for session {session_id}")
+            
+        except Exception as e:
+            logger.error(f"❌ Background database operations failed: {e}")
+            import traceback
+            logger.error(f"❌ Background operations traceback: {traceback.format_exc()}")
+
     def _update_session_memory_with_contact_info(self, session_id: str, contact_info: Dict[str, str]):
         """Update session memory with extracted contact info"""
         try:
