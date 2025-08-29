@@ -18,6 +18,7 @@ export const ChatBox = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [inputMessage, setInputMessage] = useState("");
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -25,7 +26,7 @@ export const ChatBox = () => {
   useEffect(() => {
     const welcomeMessage: Message = {
       id: "welcome",
-      text: "Hello! I'm your professional student visa consultant. I can help you with visa applications for USA, UK, South Korea, and Australia. What country are you interested in studying in?",
+      text: "Hello! I'm your professional student visa consultant. I can help you with visa applications for USA, UK, South Korea, and Australia.\n\nYou can ask me about:\n• Visa requirements and documents\n• Application processes and timelines\n• Financial requirements and costs\n• IELTS preparation and booking\n• University admission guidance\n• Interview preparation\n\nWhat country are you interested in studying in?",
       isUser: false,
       timestamp: new Date(),
     };
@@ -61,9 +62,10 @@ export const ChatBox = () => {
     setInputMessage("");
     setIsProcessing(true);
 
-    // Hide mobile keyboard by blurring textarea
+    // Keep focus on textarea but don't blur - let user see the response
+    // This prevents the mobile keyboard from disappearing immediately
     if (textareaRef.current) {
-      textareaRef.current.blur();
+      textareaRef.current.focus();
     }
 
     try {
@@ -87,12 +89,10 @@ export const ChatBox = () => {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsProcessing(false);
-      // Restore focus after a delay for smooth UX
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-        }
-      }, 500);
+      // Keep focus on textarea after response - user can continue typing
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+      }
     }
   };
 
@@ -101,6 +101,26 @@ export const ChatBox = () => {
       e.preventDefault();
       handleSendMessage();
     }
+  };
+
+  const handleInputFocus = () => {
+    setIsInputFocused(true);
+  };
+
+  const handleInputBlur = () => {
+    // Only blur if user explicitly clicks away or navigates
+    // Don't auto-blur after sending messages
+    if (!isProcessing) {
+      setIsInputFocused(false);
+    }
+  };
+
+  const handleInputClick = () => {
+    // Ensure focus when user clicks on the input
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+    setIsInputFocused(true);
   };
 
   return (
@@ -172,7 +192,7 @@ export const ChatBox = () => {
         </ScrollArea>
       </div>
 
-      {/* Input - Mobile optimized, always enabled */}
+      {/* Input - Mobile optimized, always enabled, stays at bottom */}
       <div className="flex-none bg-white border-t border-gray-100 px-4 py-3 sm:px-6">
         <div className="flex items-end space-x-3">
           <Textarea
@@ -180,9 +200,15 @@ export const ChatBox = () => {
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about student visas, requirements, or application processes..."
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            onClick={handleInputClick}
+            placeholder="student visas, requirements, application processes, costs, IELTS..."
             disabled={false} // Always enabled for smooth UX
-            className="min-h-[44px] max-h-32 resize-none border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm rounded-xl transition-all duration-200 mobile-input"
+            className={cn(
+              "min-h-[44px] max-h-32 resize-none border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm rounded-xl transition-all duration-200 mobile-input",
+              isInputFocused && "ring-2 ring-blue-200"
+            )}
           />
           <Button
             onClick={handleSendMessage}

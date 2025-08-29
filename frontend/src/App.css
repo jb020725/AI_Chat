@@ -154,7 +154,7 @@
   -webkit-overflow-scrolling: touch;
 }
 
-/* Mobile keyboard handling - Improved */
+/* Mobile keyboard handling - Improved for ChatGPT-like behavior */
 @media (max-height: 500px) {
   .chat-container {
     height: 100vh;
@@ -171,6 +171,26 @@
     padding: 0.75rem;
     box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
   }
+}
+
+/* Input container positioning - Always stays at bottom */
+.input-container {
+  position: sticky;
+  bottom: 0;
+  background: white;
+  z-index: 40;
+  transition: transform 0.3s ease;
+}
+
+/* Prevent auto-pop up behavior */
+.input-container:not(.focused) {
+  transform: translateY(0);
+}
+
+/* Smooth focus transitions */
+.input-container.focused {
+  transform: translateY(0);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
 }
 
 /* Message bubble animations */
@@ -224,4 +244,40 @@
 
 .touch-target:active {
   transform: scale(0.95);
+}
+
+/* Prevent viewport jumping on mobile */
+@media (max-width: 768px) {
+  .chat-container {
+    height: 100vh;
+    height: 100dvh; /* Use dynamic viewport height */
+    overflow: hidden;
+  }
+  
+  .input-container {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    z-index: 40;
+  }
+  
+  /* Ensure smooth scrolling without viewport jumps */
+  .scroll-container {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+}
+
+/* Focus management for better UX */
+.textarea-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Prevent auto-zoom on iOS */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  .textarea-input {
+    font-size: 16px;
+  }
 }
