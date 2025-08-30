@@ -10,8 +10,8 @@ https://ai-chatbot-frontend-irsvqln4dq-uc.a.run.app
 ```
 
 ### **📱 Telegram Bot:**
-**Bot Name:** `@YourStudentVisaBot` *(Replace with actual bot username)*
-**Direct Link:** `https://t.me/YourStudentVisaBot` *(Replace with actual bot username)*
+**Bot Name:** `@Visa_Consultant_Bot`
+**Direct Link:** `https://t.me/Visa_Consultant_Bot`
 
 ### **🔧 Backend API:**
 ```
