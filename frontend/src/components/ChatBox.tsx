@@ -105,9 +105,17 @@ export const ChatBox = () => {
     setInputMessage("");
     setIsProcessing(true);
 
-    // Hide mobile keyboard by blurring textarea after sending
+    // Handle focus after sending message
     if (textareaRef.current) {
-      textareaRef.current.blur();
+      if (isMobile) {
+        // Hide mobile keyboard by blurring textarea after sending
+        textareaRef.current.blur();
+      } else {
+        // Auto-focus back to input on desktop (not mobile)
+        setTimeout(() => {
+          textareaRef.current?.focus();
+        }, 100);
+      }
     }
 
     try {
