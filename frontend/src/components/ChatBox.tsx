@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Send, Sparkles, Search, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { sendMessage } from "@/lib/api";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Message {
   id: string;
@@ -20,6 +21,7 @@ export const ChatBox = () => {
   const [inputMessage, setInputMessage] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isMobile = useIsMobile();
 
   // Add welcome message on component mount
   useEffect(() => {
@@ -32,8 +34,8 @@ export const ChatBox = () => {
     setMessages([welcomeMessage]);
   }, []);
 
-  // Auto-scroll to bottom with smooth animation
-  useEffect(() => {
+  // Function to scroll to bottom
+  const scrollToBottom = (behavior: 'smooth' | 'auto' = 'smooth') => {
     if (scrollAreaRef.current) {
       const viewport = scrollAreaRef.current.querySelector(
         '[data-radix-scroll-area-viewport]'
@@ -41,11 +43,53 @@ export const ChatBox = () => {
       if (viewport) {
         viewport.scrollTo({
           top: viewport.scrollHeight,
-          behavior: 'smooth'
+          behavior
         });
       }
     }
+  };
+
+  // Auto-scroll to bottom with smooth animation
+  useEffect(() => {
+    scrollToBottom();
   }, [messages, isProcessing]);
+
+  // Handle mobile keyboard focus - scroll to bottom when input is focused
+  const handleInputFocus = () => {
+    if (isMobile) {
+      // Small delay to allow keyboard to appear, then scroll
+      setTimeout(() => {
+        scrollToBottom('auto');
+      }, 300);
+    }
+  };
+
+  // Handle viewport resize (mobile keyboard appearing/disappearing)
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const handleResize = () => {
+      // If input is focused and viewport height decreased (keyboard appeared)
+      if (document.activeElement === textareaRef.current) {
+        setTimeout(() => {
+          scrollToBottom('auto');
+        }, 100);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    // Also listen for visual viewport changes (more reliable on mobile)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+      }
+    };
+  }, [isMobile]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isProcessing) return;
@@ -174,6 +218,7 @@ export const ChatBox = () => {
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyDown={handleKeyDown}
+            onFocus={handleInputFocus}
             placeholder="Ask about student visas, application process, ielts, etc."
             disabled={false}
             className="min-h-[48px] max-h-32 resize-none border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm rounded-xl transition-all duration-200 px-3 py-2.5 sm:px-4 sm:py-3"

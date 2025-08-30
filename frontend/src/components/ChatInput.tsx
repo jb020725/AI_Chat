@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -18,11 +19,20 @@ export const ChatInput = ({
   isProcessing = false
 }: ChatInputProps) => {
   const [message, setMessage] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isMobile = useIsMobile();
 
   const handleSubmit = () => {
     if (message.trim() && !disabled && !isProcessing) {
       onSendMessage(message.trim());
       setMessage("");
+      
+      // Auto-focus back to input on desktop (not mobile)
+      if (!isMobile && textareaRef.current) {
+        setTimeout(() => {
+          textareaRef.current?.focus();
+        }, 100);
+      }
     }
   };
 
@@ -36,6 +46,7 @@ export const ChatInput = ({
   return (
     <div className="flex items-end gap-3 p-4 bg-white border-t border-gray-100">
       <Textarea
+        ref={textareaRef}
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         onKeyDown={handleKeyDown}
